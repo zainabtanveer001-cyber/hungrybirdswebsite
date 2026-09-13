@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#f97316"
+    >
+
+    <title>
+        Hungry Birds Restaurant - Order Online
+    </title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        rel="stylesheet"
+    >
+
+    <!-- =========================================================
+         CUSTOM TAILWIND CONFIG
+    ========================================================== -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+
+                    boxShadow: {
+                        soft:
+                            "0 10px 35px rgba(15, 23, 42, 0.08)",
+
+                        glow:
+                            "0 10px 35px rgba(249, 115, 22, 0.22)"
+                    },
+
+                    keyframes: {
+
+                        float: {
+                            "0%, 100%": {
+                                transform:
+                                    "translate3d(0, 0, 0)"
+                            },
+
+                            "50%": {
+                                transform:
+                                    "translate3d(0, -10px, 0)"
+                            }
+                        },
+
+                        pulseSoft: {
+                            "0%, 100%": {
+                                transform: "scale(1)",
+                                opacity: ".55"
+                            },
+
+                            "50%": {
+                                transform: "scale(1.08)",
+                                opacity: ".85"
+                            }
+                        }
+                    },
+
+                    animation: {
+
+                        float:
+                            "float 5s ease-in-out infinite",
+
+                        "pulse-soft":
+                            "pulseSoft 4s ease-in-out infinite"
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- =========================================================
+         MODERN ANIMATION / UI CSS
+    ========================================================== -->
+    <style>
+
+        :root {
+            --orange: #f97316;
+            --orange-dark: #ea580c;
+            --ink: #111827;
+        }
+
+
+        /* ---------------------------------------------------------
+           GLOBAL
+        --------------------------------------------------------- */
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            overflow-x: hidden;
+
+            background:
+                radial-gradient(
+                    circle at 10% 15%,
+                    rgba(249, 115, 22, .07),
+                    transparent 24rem
+                ),
+
+                radial-gradient(
+                    circle at 92% 45%,
+                    rgba(251, 146, 60, .06),
+                    transparent 22rem
+                ),
+
+                #f8fafc;
+        }
+
+
+        button,
+        input {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+
+        /* ---------------------------------------------------------
+           HIDE SCROLLBAR
+        --------------------------------------------------------- */
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+
+        /* ---------------------------------------------------------
+           HERO
+        --------------------------------------------------------- */
+
+        .hero-orb {
+            position: absolute;
+
+            border-radius: 9999px;
+
+            pointer-events: none;
+
+            filter: blur(2px);
+        }
+
+        .hero-grid {
+
+            background-image:
+                linear-gradient(
+                    rgba(148, 163, 184, .075) 1px,
+                    transparent 1px
+                ),
+
+                linear-gradient(
+                    90deg,
+                    rgba(148, 163, 184, .075) 1px,
+                    transparent 1px
+                );
+
+            background-size:
+                28px 28px;
+
+            mask-image:
+                linear-gradient(
+                    to bottom,
+                    black,
+                    transparent
+                );
+        }
+
+
+        /* ---------------------------------------------------------
+           REVEAL ANIMATION
+        --------------------------------------------------------- */
+
+        .reveal {
+
+            opacity: 0;
+
+            transform:
+                translateY(18px)
+                scale(.985);
+
+            transition:
+                opacity .65s
+                    cubic-bezier(.22, 1, .36, 1),
+
+                transform .65s
+                    cubic-bezier(.22, 1, .36, 1);
+        }
+
+
+        .reveal.is-visible {
+
+            opacity: 1;
+
+            transform:
+                translateY(0)
+                scale(1);
+        }
+
+
+        /* ---------------------------------------------------------
+           MENU CARDS
+        --------------------------------------------------------- */
+
+        .menu-card {
+
+            position: relative;
+
+            transform:
+                translateY(0);
+
+            transition:
+
+                transform .35s
+                    cubic-bezier(.22, 1, .36, 1),
+
+                box-shadow .35s ease,
+
+                border-color .35s ease;
+
+            will-change: transform;
+        }
+
+
+        .menu-card::after {
+
+            content: "";
+
+            position: absolute;
+
+            inset: 0;
+
+            pointer-events: none;
+
+            background:
+                linear-gradient(
+                    120deg,
+                    rgba(255,255,255,0) 35%,
+                    rgba(255,255,255,.45) 50%,
+                    rgba(255,255,255,0) 65%
+                );
+
+            transform:
+                translateX(-130%);
+
+            transition:
+                transform .8s ease;
+        }
+
+
+        .menu-card:hover {
+
+            transform:
+                translateY(-7px);
+
+            box-shadow:
+                0 18px 42px
+                rgba(15, 23, 42, .13);
+
+            border-color:
+                rgba(249, 115, 22, .28);
+        }
+
+
+        .menu-card:hover::after {
+
+            transform:
+                translateX(130%);
+        }
+
+
+        .menu-card img {
+
+            transition:
+
+                transform .65s
+                    cubic-bezier(.22, 1, .36, 1),
+
+                filter .4s ease;
+        }
+
+
+        .menu-card:hover img {
+
+            transform:
+                scale(1.065);
+
+            filter:
+                saturate(1.05);
+        }
+
+
+        /* ---------------------------------------------------------
+           CATEGORY BUTTONS
+        --------------------------------------------------------- */
+
+        .category-btn {
+
+            position: relative;
+
+            isolation: isolate;
+
+            transform:
+                translateZ(0);
+
+            transition:
+
+                color .25s ease,
+
+                background-color .25s ease,
+
+                box-shadow .25s ease,
+
+                transform .25s ease;
+        }
+
+
+        .category-btn:hover {
+
+            transform:
+                translateY(-1px);
+        }
+
+
+        .category-btn.active {
+
+            box-shadow:
+                0 8px 22px
+                rgba(249, 115, 22, .24);
+        }
+
+
+        .category-btn.active::before {
+
+            content: "";
+
+            position: absolute;
+
+            inset: 0;
+
+            border-radius: inherit;
+
+            background:
+                linear-gradient(
+                    100deg,
+                    rgba(255,255,255,.08),
+                    rgba(255,255,255,.22),
+                    rgba(255,255,255,.08)
+                );
+
+            animation:
+                categoryShimmer
+                2.2s linear infinite;
+
+            z-index: -1;
+        }
+
+        .floating-action {
+            animation: floatingActionPulse 2.2s ease-in-out infinite;
+        }
+
+        @keyframes floatingActionPulse {
+            0%, 100% {
+                transform: translateY(0);
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.24);
+            }
+            50% {
+                transform: translateY(-2px);
+                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+            }
+        }
+
+
+        @keyframes categoryShimmer {
+
+            from {
+                transform:
+                    translateX(-120%);
+            }
+
+            to {
+                transform:
+                    translateX(120%);
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           MODALS
+        --------------------------------------------------------- */
+
+        .modal-backdrop {
+
+            opacity: 0;
+
+            pointer-events: none;
+
+            transition:
+                opacity .28s ease;
+        }
+
+
+        .modal-backdrop.is-open {
+
+            opacity: 1;
+
+            pointer-events: auto;
+        }
+
+
+        .modal-panel {
+
+            opacity: 0;
+
+            transform:
+                translateY(18px)
+                scale(.96);
+
+            transition:
+
+                opacity .3s
+                    cubic-bezier(.22,1,.36,1),
+
+                transform .38s
+                    cubic-bezier(.22,1,.36,1);
+        }
+
+
+        .modal-backdrop.is-open
+        .modal-panel {
+
+            opacity: 1;
+
+            transform:
+                translateY(0)
+                scale(1);
+        }
+
+
+        /* ---------------------------------------------------------
+           FLOATING CART
+        --------------------------------------------------------- */
+
+        .floating-cart {
+
+            opacity: 0;
+
+            transform:
+                translateY(16px)
+                scale(.97);
+
+            pointer-events: none;
+
+            transition:
+
+                opacity .3s ease,
+
+                transform .4s
+                    cubic-bezier(.22,1,.36,1);
+        }
+
+
+        .floating-cart.is-visible {
+
+            opacity: 1;
+
+            transform:
+                translateY(0)
+                scale(1);
+
+            pointer-events: auto;
+        }
+
+
+        /* Cart modal/checkout already cover this role on small screens */
+        @media (max-width: 767px) {
+
+            .floating-cart {
+                display: none !important;
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           BOTTOM NAV (MOBILE)
+        --------------------------------------------------------- */
+
+        .bottom-nav {
+
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .bottom-nav-btn {
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            justify-content: center;
+
+            gap: 2px;
+
+            padding: 10px 4px 8px;
+
+            font-size: 11px;
+
+            font-weight: 600;
+
+            color: #94a3b8;
+
+            transition: color .2s ease;
+        }
+
+        .bottom-nav-btn i {
+
+            font-size: 18px;
+        }
+
+        .bottom-nav-btn.active {
+
+            color: var(--orange);
+        }
+
+
+        /* ---------------------------------------------------------
+           PLACE ORDER BUTTON ANIMATION
+        --------------------------------------------------------- */
+
+        .order-btn {
+
+            position: relative;
+
+            overflow: hidden;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+        }
+
+        .order-btn .spinner,
+        .order-btn .success-box {
+
+            position: absolute;
+
+            top: 50%;
+
+            left: 50%;
+
+            transform: translate(-50%, -50%);
+
+            opacity: 0;
+
+            pointer-events: none;
+
+            transition: opacity .25s ease;
+        }
+
+        .order-btn .btn-text {
+
+            transition: opacity .2s ease;
+        }
+
+        .order-btn.loading .btn-text,
+        .order-btn.success .btn-text {
+
+            opacity: 0;
+        }
+
+        .order-btn.loading .spinner {
+
+            opacity: 1;
+
+            animation: placeOrderSpin .8s linear infinite;
+        }
+
+        .order-btn.success .success-box {
+
+            opacity: 1;
+        }
+
+        .order-btn .spinner {
+
+            width: 22px;
+
+            height: 22px;
+
+            border: 3px solid rgba(255, 255, 255, .35);
+
+            border-top-color: #fff;
+
+            border-radius: 9999px;
+        }
+
+        .order-btn .success-box {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            white-space: nowrap;
+        }
+
+        .order-btn .checkmark {
+
+            width: 22px;
+
+            height: 22px;
+
+            border-radius: 50%;
+
+            stroke: #fff;
+
+            stroke-width: 4;
+
+            stroke-miterlimit: 10;
+
+            flex-shrink: 0;
+        }
+
+        .order-btn.success .checkmark-check {
+
+            stroke-dasharray: 48;
+
+            stroke-dashoffset: 48;
+
+            animation: placeOrderStroke .3s cubic-bezier(.65, 0, .45, 1) .15s forwards;
+        }
+
+        .order-btn .confetti span {
+
+            position: absolute;
+
+            width: 6px;
+
+            height: 6px;
+
+            background: #fef08a;
+
+            border-radius: 50%;
+
+            left: 50%;
+
+            top: 50%;
+
+            opacity: 0;
+        }
+
+        .order-btn.success .confetti span {
+
+            animation: placeOrderBurst .6s ease-out forwards;
+        }
+
+        .order-btn .confetti span:nth-child(1) { --angle: 0deg; }
+        .order-btn .confetti span:nth-child(2) { --angle: 60deg; }
+        .order-btn .confetti span:nth-child(3) { --angle: 120deg; }
+        .order-btn .confetti span:nth-child(4) { --angle: 180deg; }
+        .order-btn .confetti span:nth-child(5) { --angle: 240deg; }
+        .order-btn .confetti span:nth-child(6) { --angle: 300deg; }
+
+        @keyframes placeOrderSpin {
+
+            to {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+
+        @keyframes placeOrderStroke {
+
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes placeOrderBurst {
+
+            0% {
+                transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-32px);
+                opacity: 0;
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           CART BOUNCE
+        --------------------------------------------------------- */
+
+        .cart-bump {
+
+            animation:
+                cartBump .35s
+                cubic-bezier(.22,1,.36,1);
+        }
+
+
+        @keyframes cartBump {
+
+            0% {
+                transform:
+                    scale(1);
+            }
+
+            45% {
+                transform:
+                    scale(1.14)
+                    rotate(-2deg);
+            }
+
+            100% {
+                transform:
+                    scale(1);
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           PRICE ANIMATION
+        --------------------------------------------------------- */
+
+        .price-pop {
+
+            animation:
+                pricePop .35s
+                cubic-bezier(.22,1,.36,1);
+        }
+
+
+        @keyframes pricePop {
+
+            0% {
+
+                transform:
+                    translateY(5px);
+
+                opacity:
+                    .35;
+            }
+
+            100% {
+
+                transform:
+                    translateY(0);
+
+                opacity:
+                    1;
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           TOAST
+        --------------------------------------------------------- */
+
+        .toast {
+
+            transform:
+                translateY(18px)
+                scale(.96);
+
+            opacity: 0;
+
+            pointer-events: none;
+
+            transition:
+
+                all .35s
+                cubic-bezier(.22,1,.36,1);
+        }
+
+
+        .toast.show {
+
+            transform:
+                translateY(0)
+                scale(1);
+
+            opacity: 1;
+        }
+
+
+        /* ---------------------------------------------------------
+           LOADING SKELETON
+        --------------------------------------------------------- */
+
+        .skeleton {
+
+            position: relative;
+
+            overflow: hidden;
+
+            background:
+                #e5e7eb;
+        }
+
+
+        .skeleton::after {
+
+            content: "";
+
+            position: absolute;
+
+            inset: 0;
+
+            transform:
+                translateX(-100%);
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255,255,255,.7),
+                    transparent
+                );
+
+            animation:
+                skeleton 1.25s infinite;
+        }
+
+
+        @keyframes skeleton {
+
+            100% {
+                transform:
+                    translateX(100%);
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+           BUTTON PRESS
+        --------------------------------------------------------- */
+
+        .pressable {
+
+            transition:
+                transform .12s ease;
+        }
+
+
+        .pressable:active {
+
+            transform:
+                scale(.96);
+        }
+
+
+        /* ---------------------------------------------------------
+           SCROLL PROGRESS
+        --------------------------------------------------------- */
+
+        .scroll-top-progress {
+
+            transform-origin:
+                left center;
+
+            transform:
+                scaleX(0);
+
+            transition:
+                transform .08s linear;
+        }
+
+
+        /* ---------------------------------------------------------
+           ACCESSIBILITY
+        --------------------------------------------------------- */
+
+        @media (
+            prefers-reduced-motion: reduce
+        ) {
+
+            html {
+                scroll-behavior:
+                    auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+
+                animation-duration:
+                    .01ms !important;
+
+                animation-iteration-count:
+                    1 !important;
+
+                transition-duration:
+                    .01ms !important;
+            }
+
+            .reveal {
+
+                opacity: 1;
+
+                transform:
+                    none;
+            }
+        }
+
+    </style>
+
+</head>
+
+
+<body
+    class="font-sans text-gray-800 antialiased pb-16 md:pb-0"
+>
+
+
+    <!-- =========================================================
+         SCROLL PROGRESS
+    ========================================================== -->
+
+    <div
+        id="scrollProgress"
+        class="fixed top-0 left-0 right-0 h-0.5 bg-orange-500 z-[70] scroll-top-progress"
+    ></div>
+
+
+    <!-- =========================================================
+         NAVBAR
+    ========================================================== -->
+
+    <nav
+        id="mainNav"
+        class="
+            fixed
+            top-0
+            left-0
+            right-0
+            bg-white/80
+            backdrop-blur-xl
+            border-b
+            border-white/60
+            shadow-sm
+            z-50
+            transition-all
+            duration-300
+        "
+    >
+
+        <div
+            class="
+                max-w-7xl
+                mx-auto
+                px-4
+                sm:px-6
+                lg:px-8
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    h-16
+                    items-center
+                "
+            >
+
+
+                <!-- BRAND -->
+
+                <button
+                    id="brandBtn"
+                    class="
+                        flex-shrink-0
+                        flex
+                        items-center
+                        gap-2
+                        pressable
+                    "
+                    aria-label="Go to top"
+                >
+
+                    <span
+                        class="
+                            w-10
+                            h-10
+                            rounded-2xl
+                            bg-orange-500
+                            text-white
+                            grid
+                            place-items-center
+                            shadow-glow
+                        "
+                    >
+
+                        <i
+                            class="fa-solid fa-utensils"
+                        ></i>
+
+                    </span>
+
+
+                    <span
+                        class="
+                            font-extrabold
+                            text-lg
+                            sm:text-xl
+                            tracking-tight
+                        "
+                    >
+                        Hungry Birds
+                    </span>
+
+                </button>
+
+
+                <!-- RIGHT SIDE -->
+
+                <div
+                    class="
+                        flex
+                        items-center
+                        gap-2
+                        sm:gap-4
+                    "
+                >
+
+                    <!-- LOGIN -->
+
+                    <button
+                        id="loginBtn"
+                        class="
+                            text-sm
+                            font-semibold
+                            text-gray-600
+                            hover:text-orange-500
+                            transition-colors
+                            pressable
+                        "
+                        aria-label="Login or Register"
+                    >
+                        <i class="fa-solid fa-right-to-bracket sm:hidden"></i>
+                        <span class="hidden sm:inline">Login / Register</span>
+                    </button>
+
+
+                    <!-- USER PROFILE -->
+
+                    <div
+                        id="userProfile"
+                        class="
+                            hidden
+                            items-center
+                            gap-3
+                        "
+                    >
+
+                        <span
+                            id="userNameDisplay"
+                            class="
+                                hidden
+                                sm:inline
+                                text-sm
+                                font-semibold
+                                text-gray-700
+                            "
+                        ></span>
+
+
+                        <button
+                            id="pastOrdersBtn"
+                            class="
+                                text-xs
+                                bg-gray-100
+                                px-3
+                                py-1.5
+                                rounded-full
+                                hover:bg-gray-200
+                                transition-colors
+                                pressable
+                            "
+                        >
+                            Past Orders
+                        </button>
+
+
+                        <button
+                            id="logoutBtn"
+                            class="
+                                w-9
+                                h-9
+                                rounded-full
+                                bg-red-50
+                                text-red-500
+                                hover:bg-red-100
+                                transition-colors
+                                pressable
+                            "
+                            aria-label="Log out"
+                        >
+
+                            <i
+                                class="
+                                    fa-solid
+                                    fa-right-from-bracket
+                                "
+                            ></i>
+
+                        </button>
+
+                    </div>
+
+
+                    <!-- CART -->
+
+                    <button
+                        id="cartBtn"
+                        class="
+                            relative
+                            p-3
+                            bg-orange-500
+                            text-white
+                            rounded-2xl
+                            hover:bg-orange-600
+                            transition-all
+                            duration-200
+                            shadow-glow
+                            pressable
+                        "
+                        aria-label="Open cart"
+                    >
+
+                        <i
+                            class="
+                                fa-solid
+                                fa-cart-shopping
+                            "
+                        ></i>
+
+
+                        <span
+                            id="cartCount"
+                            class="
+                                absolute
+                                -top-1.5
+                                -right-1.5
+                                bg-red-600
+                                text-white
+                                text-xs
+                                font-bold
+                                rounded-full
+                                h-5
+                                w-5
+                                flex
+                                items-center
+                                justify-center
+                                border-2
+                                border-white
+                            "
+                        >
+                            0
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </nav>
+
+
+    <!-- =========================================================
+         HERO
+    ========================================================== -->
+
+    <header
+        class="
+            relative
+            pt-28
+            pb-14
+            px-4
+            sm:px-6
+            lg:px-8
+            max-w-7xl
+            mx-auto
+            text-center
+            overflow-hidden
+        "
+    >
+
+        <!-- Grid -->
+
+        <div
+            class="
+                hero-grid
+                absolute
+                inset-x-0
+                top-0
+                h-[340px]
+                pointer-events-none
+            "
+        ></div>
+
+
+        <!-- Animated Orbs -->
+
+        <div
+            class="
+                hero-orb
+                w-48
+                h-48
+                bg-orange-200/45
+                -left-20
+                top-16
+                animate-pulse-soft
+            "
+        ></div>
+
+
+        <div
+            class="
+                hero-orb
+                w-56
+                h-56
+                bg-amber-200/35
+                -right-20
+                top-4
+                animate-float
+            "
+        ></div>
+
+
+        <!-- Hero Content -->
+
+        <div
+            class="
+                relative
+                z-10
+                reveal
+                is-visible
+            "
+        >
+
+            <!-- Badge -->
+
+            <div
+                class="
+                    inline-flex
+                    items-center
+                    gap-2
+                    px-4
+                    py-2
+                    rounded-full
+                    bg-white/80
+                    border
+                    border-orange-100
+                    shadow-soft
+                    text-sm
+                    font-semibold
+                    text-orange-600
+                    mb-5
+                "
+            >
+
+                <span
+                    class="
+                        w-2
+                        h-2
+                        rounded-full
+                        bg-orange-500
+                        animate-pulse
+                    "
+                ></span>
+
+                Freshly prepared • Fast delivery
+
+            </div>
+
+
+            <!-- Heading -->
+
+            <h1
+                class="
+                    text-4xl
+                    sm:text-5xl
+                    lg:text-6xl
+                    font-black
+                    text-gray-900
+                    tracking-tight
+                    mb-5
+                    leading-[1.05]
+                "
+            >
+
+                Cravings, Delivered
+
+                <span
+                    class="
+                        text-transparent
+                        bg-clip-text
+                        bg-gradient-to-r
+                        from-orange-500
+                        to-amber-500
+                    "
+                >
+                    Fast.
+                </span>
+
+            </h1>
+
+
+            <!-- Description -->
+
+            <p
+                class="
+                    text-lg
+                    text-gray-500
+                    max-w-2xl
+                    mx-auto
+                    leading-relaxed
+                "
+            >
+                Explore our menu featuring
+                Karahis, Sajji, Burgers,
+                BBQ and more.
+                Choose your favourites
+                and order in seconds.
+            </p>
+
+
+            <!-- Hero Buttons -->
+
+            <div
+                class="
+                    mt-7
+                    flex
+                    flex-wrap
+                    items-center
+                    justify-center
+                    gap-3
+                "
+            >
+
+                <button
+                    id="browseMenuBtn"
+                    class="
+                        px-5
+                        py-3
+                        rounded-2xl
+                        bg-gray-900
+                        text-white
+                        font-bold
+                        shadow-lg
+                        hover:-translate-y-0.5
+                        hover:shadow-xl
+                        transition-all
+                        pressable
+                    "
+                >
+
+                    Browse Menu
+
+                    <i
+                        class="
+                            fa-solid
+                            fa-arrow-down
+                            ml-2
+                            text-orange-400
+                        "
+                    ></i>
+
+                </button>
+
+
+                <div
+                    class="
+                        px-4
+                        py-3
+                        rounded-2xl
+                        bg-white/75
+                        border
+                        border-gray-200
+                        text-gray-600
+                        text-sm
+                        shadow-soft
+                    "
+                >
+
+                    <i
+                        class="
+                            fa-solid
+                            fa-bolt
+                            text-orange-500
+                            mr-1
+                        "
+                    ></i>
+
+                    Smooth online ordering
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================================================
+         STICKY CATEGORY BAR
+    ========================================================== -->
+
+    <div
+        id="categoryBar"
+        class="
+            sticky
+            top-16
+            bg-white/85
+            backdrop-blur-xl
+            z-40
+            border-y
+            border-gray-200/80
+            shadow-sm
+            transition-all
+            duration-300
+        "
+    >
+
+        <div
+            class="
+                max-w-7xl
+                mx-auto
+                px-4
+                sm:px-6
+                lg:px-8
+                py-3
+            "
+        >
+
+            <div
+                id="categoryContainer"
+                class="
+                    flex
+                    space-x-3
+                    overflow-x-auto
+                    no-scrollbar
+                "
+            >
+
+                <!-- Categories generated by JavaScript -->
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MENU
+    ========================================================== -->
+
+    <main
+        id="menuSection"
+        class="
+            max-w-7xl
+            mx-auto
+            px-4
+            sm:px-6
+            lg:px-8
+            py-8
+            min-h-screen
+        "
+    >
+
+        <div
+            id="menuGrid"
+            class="
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                md:grid-cols-3
+                lg:grid-cols-4
+                gap-6
+            "
+        >
+
+            <!-- Menu generated by JavaScript -->
+
+        </div>
+
+    </main>
+
+
+    <!-- =========================================================
+         ABOUT / OWNER / REVIEWS
+    ========================================================== -->
+
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+        <div class="grid gap-6 sm:gap-8 lg:grid-cols-2">
+            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-orange-100 bg-white p-4 sm:p-6 lg:p-8 shadow-soft">
+                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-500 mb-2 sm:mb-3">About Us</p>
+                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 mb-3 sm:mb-4">Serving comfort food with heart and flavor.</h2>
+                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-gray-600 mb-4">
+                    Hungry Birds brings together bold flavors, generous portions, and warm hospitality in one place.
+                    From family meals to late-night cravings, we cook every order with the same care we would serve at our own table.
+                </p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-orange-50 p-3 sm:p-4">
+                        <div class="text-xl sm:text-2xl font-black text-orange-600">4.9/5</div>
+                        <div class="text-xs sm:text-sm text-gray-600">Customer rating</div>
+                    </div>
+                    <div class="rounded-2xl bg-amber-50 p-3 sm:p-4">
+                        <div class="text-xl sm:text-2xl font-black text-amber-600">15 min</div>
+                        <div class="text-xs sm:text-sm text-gray-600">Fast delivery</div>
+                    </div>
+                    <div class="rounded-2xl bg-emerald-50 p-3 sm:p-4">
+                        <div class="text-xl sm:text-2xl font-black text-emerald-600">Fresh</div>
+                        <div class="text-xs sm:text-sm text-gray-600">Made daily</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-orange-100 bg-gradient-to-br from-orange-500 to-amber-500 p-4 sm:p-6 lg:p-8 text-white shadow-glow">
+                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-100 mb-2 sm:mb-3">Owner’s Message</p>
+                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black mb-3 sm:mb-4">A taste you can trust.</h2>
+                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-orange-50/95">
+                    Thank you for choosing Hungry Birds. Our goal is simple: bring honest, delicious food to your table with the hospitality and quality you deserve. Every recipe is prepared with dedication, and every order is treated like a personal invitation to share a great meal with family and friends.
+                </p>
+                <div class="mt-5 sm:mt-6 flex items-center gap-3">
+                    <div class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white/20 text-base sm:text-lg font-black">HB</div>
+                    <div>
+                        <div class="text-sm sm:text-base font-bold">Hungry Birds</div>
+                        <div class="text-xs sm:text-sm text-orange-100">Owner & Chef</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 sm:mt-12 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-200 bg-white p-4 sm:p-6 lg:p-8 shadow-soft">
+            <div class="flex flex-col gap-4 sm:gap-5 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-500 mb-2">Google Reviews</p>
+                    <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900">Loved by our local community.</h2>
+                </div>
+                <a
+                    href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-3 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                >
+                    <span>★★★★★</span>
+                    <span>Open on Google Maps</span>
+                </a>
+            </div>
+
+            <div class="mt-6 sm:mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div class="overflow-hidden rounded-[1.25rem] sm:rounded-[1.75rem] border border-gray-200 bg-gradient-to-br from-sky-50 via-white to-orange-50 p-2 sm:p-4">
+                    <div class="overflow-hidden rounded-[1rem] sm:rounded-[1.5rem] border border-orange-100 bg-white/80 shadow-soft">
+                        <iframe
+                            src="https://www.google.com/maps?q=Hungry%20Birds&output=embed"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade"
+                            allowfullscreen
+                            class="h-[220px] sm:h-[320px] w-full border-0"
+                        ></iframe>
+                    </div>
+                </div>
+
+                <div class="space-y-4 sm:space-y-5">
+                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
+                        <p class="text-sm sm:text-base text-gray-700 leading-7">"The food was fresh, hot, and packed with flavor. The sajji and fries were absolutely worth it!"</p>
+                        <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
+                            <span class="font-bold text-gray-900">Ayesha K.</span>
+                            <span class="text-gray-500">Google Maps</span>
+                        </div>
+                    </article>
+
+                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
+                        <p class="text-sm sm:text-base text-gray-700 leading-7">"Fast delivery and amazing burgers. The service feels warm and professional every time."</p>
+                        <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
+                            <span class="font-bold text-gray-900">Usman R.</span>
+                            <span class="text-gray-500">Google Maps</span>
+                        </div>
+                    </article>
+
+                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
+                        <p class="text-sm sm:text-base text-gray-700 leading-7">"Great taste, great value, and a family-friendly vibe. This is now our go-to place for takeaway."</p>
+                        <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
+                            <span class="font-bold text-gray-900">Hina S.</span>
+                            <span class="text-gray-500">Google Maps</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+
+                    <article class="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                        <div class="mb-3 text-amber-500 text-lg">★★★★★</div>
+                        <p class="text-gray-700 leading-7">"Fast delivery and amazing burgers. The service feels warm and professional every time."</p>
+                        <div class="mt-5 flex items-center justify-between text-sm">
+                            <span class="font-bold text-gray-900">Usman R.</span>
+                            <span class="text-gray-500">Google Maps</span>
+                        </div>
+                    </article>
+
+                    <article class="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                        <div class="mb-3 text-amber-500 text-lg">★★★★★</div>
+                        <p class="text-gray-700 leading-7">"Great taste, great value, and a family-friendly vibe. This is now our go-to place for takeaway."</p>
+                        <div class="mt-5 flex items-center justify-between text-sm">
+                            <span class="font-bold text-gray-900">Hina S.</span>
+                            <span class="text-gray-500">Google Maps</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- =========================================================
+         AUTH MODAL
+    ========================================================== -->
+
+    <div
+        id="authModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-center
+            justify-center
+            backdrop-blur-md
+            p-4
+        "
+        aria-hidden="true"
+    >
+
+        <div
+            class="
+                modal-panel
+                bg-white
+                rounded-3xl
+                shadow-2xl
+                w-full
+                max-w-md
+                p-7
+                sm:p-8
+                relative
+            "
+        >
+
+            <!-- Decorative Glow -->
+
+            <div
+                class="
+                    absolute
+                    -top-16
+                    -right-10
+                    w-32
+                    h-32
+                    rounded-full
+                    bg-orange-200/30
+                    blur-2xl
+                    pointer-events-none
+                "
+            ></div>
+
+
+            <!-- Heading -->
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    items-center
+                    mb-6
+                    relative
+                "
+            >
+
+                <div>
+
+                    <p
+                        class="
+                            text-xs
+                            font-bold
+                            uppercase
+                            tracking-[.18em]
+                            text-orange-500
+                            mb-1
+                        "
+                    >
+                        Hungry Birds
+                    </p>
+
+                    <h2
+                        id="authTitle"
+                        class="
+                            text-2xl
+                            font-bold
+                            text-gray-800
+                        "
+                    >
+                        Welcome Back
+                    </h2>
+
+                </div>
+
+
+                <button
+                    id="closeAuthModal"
+                    class="
+                        w-10
+                        h-10
+                        rounded-full
+                        bg-gray-100
+                        text-gray-400
+                        hover:text-gray-700
+                        hover:bg-gray-200
+                        transition-all
+                        pressable
+                    "
+                    aria-label="Close"
+                >
+
+                    <i
+                        class="
+                            fa-solid
+                            fa-xmark
+                            text-xl
+                        "
+                    ></i>
+
+                </button>
+
+            </div>
+
+
+            <!-- Auth Form -->
+
+            <form
+                id="authForm"
+                class="space-y-4"
+            >
+
+                <!-- Email -->
+
+                <label class="block">
+
+                    <span
+                        class="
+                            text-xs
+                            font-semibold
+                            text-gray-500
+                            mb-1.5
+                            block
+                        "
+                    >
+                        Email
+                    </span>
+
+                    <input
+                        type="email"
+                        id="authEmail"
+                        placeholder="you@example.com"
+                        required
+                        class="
+                            w-full
+                            px-4
+                            py-3.5
+                            rounded-2xl
+                            border
+                            border-gray-200
+                            bg-gray-50/70
+                            focus:bg-white
+                            focus:ring-4
+                            focus:ring-orange-100
+                            focus:border-orange-400
+                            outline-none
+                            transition-all
+                        "
+                    >
+
+                </label>
+
+
+                <!-- Password -->
+
+                <label class="block">
+
+                    <span
+                        class="
+                            text-xs
+                            font-semibold
+                            text-gray-500
+                            mb-1.5
+                            block
+                        "
+                    >
+                        Password
+                    </span>
+
+                    <input
+                        type="password"
+                        id="authPassword"
+                        placeholder="Your password"
+                        required
+                        class="
+                            w-full
+                            px-4
+                            py-3.5
+                            rounded-2xl
+                            border
+                            border-gray-200
+                            bg-gray-50/70
+                            focus:bg-white
+                            focus:ring-4
+                            focus:ring-orange-100
+                            focus:border-orange-400
+                            outline-none
+                            transition-all
+                        "
+                    >
+
+                </label>
+
+
+                <!-- Submit -->
+
+                <button
+                    type="submit"
+                    id="authSubmitBtn"
+                    class="
+                        w-full
+                        bg-orange-500
+                        text-white
+                        font-bold
+                        py-3.5
+                        rounded-2xl
+                        hover:bg-orange-600
+                        transition-all
+                        shadow-glow
+                        hover:-translate-y-0.5
+                        pressable
+                    "
+                >
+                    Sign In
+                </button>
+
+            </form>
+
+
+            <!-- Toggle -->
+
+            <p
+                class="
+                    text-center
+                    text-sm
+                    text-gray-500
+                    mt-5
+                "
+            >
+
+                <span
+                    id="authToggleText"
+                >
+                    New customer?
+                </span>
+
+                <a
+                    href="#"
+                    id="toggleAuthMode"
+                    class="
+                        text-orange-500
+                        font-semibold
+                        hover:underline
+                    "
+                >
+                    Create an account
+                </a>
+
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         CART / CHECKOUT MODAL
+    ========================================================== -->
+
+    <div
+        id="cartModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-center
+            justify-center
+            backdrop-blur-md
+            p-4
+        "
+        aria-hidden="true"
+    >
+
+        <div
+            class="
+                modal-panel
+                bg-white
+                rounded-3xl
+                shadow-2xl
+                w-full
+                max-w-lg
+                max-h-[88vh]
+                flex
+                flex-col
+                overflow-hidden
+            "
+        >
+
+            <!-- Header -->
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    items-center
+                    p-6
+                    border-b
+                    border-gray-100
+                "
+            >
+
+                <div>
+
+                    <p
+                        class="
+                            text-xs
+                            font-bold
+                            uppercase
+                            tracking-[.18em]
+                            text-orange-500
+                        "
+                    >
+                        Checkout
+                    </p>
+
+                    <h2
+                        class="
+                            text-xl
+                            font-bold
+                            text-gray-800
+                        "
+                    >
+                        Your Order
+                    </h2>
+
+                </div>
+
+
+                <button
+                    id="closeCartModal"
+                    class="
+                        w-10
+                        h-10
+                        rounded-full
+                        bg-gray-100
+                        text-gray-400
+                        hover:text-gray-700
+                        hover:bg-gray-200
+                        transition-all
+                        pressable
+                    "
+                    aria-label="Close cart"
+                >
+
+                    <i
+                        class="
+                            fa-solid
+                            fa-xmark
+                            text-xl
+                        "
+                    ></i>
+
+                </button>
+
+            </div>
+
+
+            <!-- Scrollable Content -->
+
+            <div
+                class="
+                    flex-1
+                    min-h-0
+                    overflow-y-auto
+                "
+            >
+
+                <!-- Cart Items -->
+
+                <div
+                    id="cartItemsList"
+                    class="
+                        p-6
+                        space-y-3
+                    "
+                >
+
+                </div>
+
+
+                <!-- Checkout Fields -->
+
+                <div
+                    class="
+                        p-6
+                        border-t
+                        border-gray-100
+                        space-y-3
+                        bg-gray-50/90
+                    "
+                >
+
+                    <!-- Coupon Code -->
+
+                    <div class="flex gap-2">
+
+                        <input
+                            type="text"
+                            id="couponCodeInput"
+                            placeholder="Coupon code"
+                            class="
+                                flex-1
+                                px-4
+                                py-2.5
+                                rounded-2xl
+                                border
+                                border-gray-200
+                                uppercase
+                                focus:ring-4
+                                focus:ring-orange-100
+                                focus:border-orange-400
+                                outline-none
+                                transition-all
+                            "
+                        >
+
+                        <button
+                            type="button"
+                            id="applyCouponBtn"
+                            class="
+                                px-4
+                                py-2.5
+                                rounded-2xl
+                                bg-gray-900
+                                text-white
+                                font-bold
+                                text-sm
+                                hover:bg-orange-500
+                                transition-colors
+                                pressable
+                            "
+                        >
+                            Apply
+                        </button>
+
+                    </div>
+
+                    <p
+                        id="couponMessage"
+                        class="text-xs font-semibold hidden"
+                    ></p>
+
+                    <!-- Subtotal / Discount / Total -->
+
+                    <div
+                        id="cartDiscountRow"
+                        class="flex justify-between text-sm font-semibold text-green-600 hidden"
+                    >
+
+                        <span>
+                            Discount
+                        </span>
+
+                        <span id="cartDiscountDisplay">
+                            -Rs. 0
+                        </span>
+
+                    </div>
+
+                    <div
+                        class="
+                            flex
+                            justify-between
+                            font-black
+                            text-xl
+                            text-gray-900
+                        "
+                    >
+
+                        <span>
+                            Total
+                        </span>
+
+                        <span
+                            id="cartTotalDisplay"
+                        >
+                            Rs. 0
+                        </span>
+
+                    </div>
+
+
+                    <!-- Order Type -->
+
+                    <div
+                        class="
+                            flex
+                            gap-2
+                            p-1
+                            rounded-2xl
+                            bg-gray-200/70
+                        "
+                    >
+
+                        <button
+                            type="button"
+                            id="orderTypeDelivery"
+                            class="
+                                flex-1
+                                py-2.5
+                                rounded-xl
+                                text-sm
+                                font-semibold
+                                bg-orange-500
+                                text-white
+                                shadow-sm
+                                transition-all
+                            "
+                        >
+                            Delivery
+                        </button>
+
+
+                        <button
+                            type="button"
+                            id="orderTypeTakeaway"
+                            class="
+                                flex-1
+                                py-2.5
+                                rounded-xl
+                                text-sm
+                                font-semibold
+                                text-gray-600
+                                transition-all
+                            "
+                        >
+                            Takeaway
+                        </button>
+
+                    </div>
+
+
+                    <!-- Name -->
+
+                    <input
+                        type="text"
+                        id="checkoutName"
+                        placeholder="Your Name"
+                        class="
+                            w-full
+                            px-4
+                            py-3
+                            rounded-2xl
+                            border
+                            border-gray-200
+                            focus:ring-4
+                            focus:ring-orange-100
+                            focus:border-orange-400
+                            outline-none
+                            transition-all
+                        "
+                    >
+
+
+                    <!-- Phone -->
+
+                    <input
+                        type="tel"
+                        id="checkoutPhone"
+                        placeholder="Phone Number"
+                        class="
+                            w-full
+                            px-4
+                            py-3
+                            rounded-2xl
+                            border
+                            border-gray-200
+                            focus:ring-4
+                            focus:ring-orange-100
+                            focus:border-orange-400
+                            outline-none
+                            transition-all
+                        "
+                    >
+
+
+                    <!-- Address -->
+
+                    <input
+                        type="text"
+                        id="checkoutAddress"
+                        placeholder="Delivery Address"
+                        class="
+                            w-full
+                            px-4
+                            py-3
+                            rounded-2xl
+                            border
+                            border-gray-200
+                            focus:ring-4
+                            focus:ring-orange-100
+                            focus:border-orange-400
+                            outline-none
+                            transition-all
+                        "
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- Sticky Footer -->
+
+            <div
+                class="
+                    p-4
+                    sm:p-6
+                    border-t
+                    border-gray-100
+                    bg-white
+                "
+            >
+
+                <button
+                    type="button"
+                    id="placeOrderBtn"
+                    class="
+                        order-btn
+                        w-full
+                        h-14
+                        bg-orange-500
+                        text-white
+                        font-bold
+                        rounded-2xl
+                        hover:bg-orange-600
+                        transition-all
+                        shadow-glow
+                        hover:-translate-y-0.5
+                        pressable
+                    "
+                >
+
+                    <span class="btn-text">
+                        Place Order
+                        <i
+                            class="
+                                fa-solid
+                                fa-arrow-right
+                                ml-2
+                            "
+                        ></i>
+                    </span>
+
+                    <span class="spinner"></span>
+
+                    <div class="success-box">
+                        <svg class="checkmark" viewBox="0 0 52 52">
+                            <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                            <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                        </svg>
+                        <span class="success-text">Order Placed!</span>
+                    </div>
+
+                    <div class="confetti">
+                        <span></span><span></span><span></span>
+                        <span></span><span></span><span></span>
+                    </div>
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         FLOATING CART
+    ========================================================== -->
+
+    <div
+        id="floatingCart"
+        class="
+            floating-cart
+            fixed
+            bottom-5
+            right-4
+            sm:right-6
+            z-40
+            w-[calc(100vw-2rem)]
+            sm:w-80
+            max-w-sm
+            bg-white/95
+            backdrop-blur-xl
+            rounded-3xl
+            shadow-2xl
+            border
+            border-gray-100
+            flex
+            flex-col
+            max-h-[70vh]
+            overflow-hidden
+        "
+    >
+
+        <!-- Cart Header -->
+
+        <div
+            class="
+                flex
+                justify-between
+                items-center
+                px-4
+                py-3
+                border-b
+                border-gray-100
+            "
+        >
+
+            <span
+                class="
+                    font-bold
+                    text-gray-800
+                "
+            >
+
+                <i
+                    class="
+                        fa-solid
+                        fa-cart-shopping
+                        text-orange-500
+                        mr-1
+                    "
+                ></i>
+
+                <span
+                    id="floatingCartCount"
+                >
+                    0
+                </span>
+
+                items
+
+            </span>
+
+
+            <span
+                id="floatingCartTotal"
+                class="
+                    font-black
+                    text-gray-900
+                "
+            >
+                Rs. 0
+            </span>
+
+        </div>
+
+
+        <!-- Cart Items -->
+
+        <div
+            id="floatingCartItems"
+            class="
+                p-3
+                space-y-2
+                overflow-y-auto
+                flex-1
+            "
+        ></div>
+
+
+        <!-- Checkout Button -->
+
+        <div
+            class="
+                p-3
+                border-t
+                border-gray-100
+            "
+        >
+
+            <button
+                id="floatingCheckoutBtn"
+                class="
+                    w-full
+                    bg-gray-900
+                    text-white
+                    font-bold
+                    py-3
+                    rounded-2xl
+                    hover:bg-orange-500
+                    transition-all
+                    shadow-lg
+                    pressable
+                "
+            >
+                Checkout
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         TOAST NOTIFICATION
+    ========================================================== -->
+
+    <div
+        id="toast"
+        class="
+            toast
+            fixed
+            top-20
+            right-4
+            sm:right-6
+            z-[80]
+            bg-gray-900
+            text-white
+            px-4
+            py-3
+            rounded-2xl
+            shadow-2xl
+            flex
+            items-center
+            gap-3
+            max-w-xs
+        "
+    >
+
+        <span
+            id="toastIcon"
+            class="
+                w-8
+                h-8
+                rounded-xl
+                bg-orange-500
+                grid
+                place-items-center
+                shrink-0
+            "
+        >
+            <i
+                class="fa-solid fa-check"
+            ></i>
+        </span>
+
+
+        <span
+            id="toastMessage"
+            class="
+                text-sm
+                font-semibold
+            "
+        >
+            Added to cart
+        </span>
+
+    </div>
+
+
+    <!-- =========================================================
+         PAST ORDERS MODAL
+    ========================================================== -->
+
+    <div
+        id="pastOrdersModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-center
+            justify-center
+            backdrop-blur-md
+            p-4
+            hidden
+        "
+        aria-hidden="true"
+    >
+
+        <div
+            class="
+                modal-panel
+                bg-white
+                rounded-3xl
+                shadow-2xl
+                w-full
+                max-w-lg
+                max-h-[88vh]
+                flex
+                flex-col
+                overflow-hidden
+            "
+        >
+
+            <div
+                class="
+                    flex
+                    justify-between
+                    items-center
+                    p-6
+                    border-b
+                    border-gray-100
+                "
+            >
+
+                <h2 class="text-xl font-bold text-gray-800">
+                    Past Orders
+                </h2>
+
+                <button
+                    id="closePastOrdersModal"
+                    class="
+                        w-10
+                        h-10
+                        rounded-full
+                        bg-gray-100
+                        text-gray-400
+                        hover:text-gray-700
+                        hover:bg-gray-200
+                        transition-all
+                        pressable
+                    "
+                    aria-label="Close past orders"
+                >
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+
+            </div>
+
+            <div
+                id="pastOrdersList"
+                class="
+                    p-6
+                    space-y-3
+                    overflow-y-auto
+                    flex-1
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MOBILE BOTTOM NAVIGATION
+    ========================================================== -->
+
+    <nav
+        id="bottomNav"
+        class="
+            bottom-nav
+            fixed
+            bottom-0
+            left-0
+            right-0
+            z-50
+            md:hidden
+            bg-white/90
+            backdrop-blur-xl
+            border-t
+            border-gray-200/80
+        "
+    >
+
+        <div
+            class="
+                grid
+                grid-cols-3
+            "
+        >
+
+            <button
+                id="bottomNavHome"
+                class="bottom-nav-btn active"
+            >
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </button>
+
+            <button
+                id="bottomNavMenu"
+                class="bottom-nav-btn"
+            >
+                <i class="fa-solid fa-utensils"></i>
+                <span>Menu</span>
+            </button>
+
+            <button
+                id="bottomNavCart"
+                class="bottom-nav-btn relative"
+            >
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span>Cart</span>
+
+                <span
+                    id="bottomNavCartCount"
+                    class="
+                        absolute
+                        top-1
+                        right-1/4
+                        bg-red-600
+                        text-white
+                        text-[10px]
+                        font-bold
+                        rounded-full
+                        h-4
+                        w-4
+                        flex
+                        items-center
+                        justify-center
+                        border-2
+                        border-white
+                    "
+                >
+                    0
+                </span>
+            </button>
+
+        </div>
+
+    </nav>
+
+
+    <div class="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div class="flex items-center justify-between rounded-full border border-orange-100 bg-white px-5 py-3 shadow-soft">
+            <div class="flex items-center gap-3">
+                <span class="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-sm text-white shadow-glow">
+                    <i class="fa-solid fa-phone-volume"></i>
+                </span>
+                <div>
+                    <div class="text-[10px] font-bold uppercase tracking-[.22em] text-orange-500">Call us</div>
+                    <div class="text-sm font-black text-gray-900">0325-7867774</div>
+                </div>
+            </div>
+
+            <a
+                href="tel:03257867774"
+                class="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
+            >
+                <i class="fa-solid fa-phone"></i>
+                <span>Call Now</span>
+            </a>
+        </div>
+    </div>
+
+    <footer class="bg-gray-900 text-gray-200">
+        <div class="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <span class="grid h-10 w-10 place-items-center rounded-2xl bg-orange-500 text-white shadow-glow">
+                            <i class="fa-solid fa-utensils"></i>
+                        </span>
+                        <div>
+                            <div class="text-lg font-black text-white">Hungry Birds</div>
+                            <div class="text-sm text-gray-400">Fresh food, fast service</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-6">
+                    <a href="tel:03257867774" class="inline-flex items-center gap-2 text-orange-300 hover:text-white transition-colors">
+                        <i class="fa-solid fa-phone"></i>
+                        <span>0325-7867774</span>
+                    </a>
+                    <a href="#menuSection" class="text-gray-300 hover:text-white transition-colors">Order Now</a>
+                    <a href="#top" class="text-gray-300 hover:text-white transition-colors">Back to Top</a>
+                </div>
+            </div>
+
+            <div class="mt-8 border-t border-gray-800 pt-6 text-sm text-gray-400">
+                © 2026 Hungry Birds. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <div class="fixed bottom-20 right-3 z-[70] md:hidden">
+        <div class="flex items-center gap-2 rounded-full border border-white/40 bg-white/75 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-md">
+            <a
+                href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="floating-action flex items-center gap-2 rounded-full bg-gray-900 px-3 py-2 text-[10px] font-bold text-white transition-all hover:scale-[1.03] active:scale-95"
+                aria-label="Get directions to Hungry Birds"
+            >
+                <i class="fa-solid fa-location-dot"></i>
+                <span>Directions</span>
+            </a>
+
+            <a
+                href="tel:03257867774"
+                class="floating-action flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2.5 text-[10px] font-black text-white shadow-lg shadow-orange-500/40 transition-all hover:scale-[1.03] active:scale-95"
+                aria-label="Call Hungry Birds now"
+            >
+                <i class="fa-solid fa-phone-volume"></i>
+                <span>Call Now</span>
+            </a>
+        </div>
+    </div>
+
+
+    <!-- =========================================================
+         FIREBASE / WEBSITE JAVASCRIPT
+    ========================================================== -->
+
+    <script
+        type="module"
+        src="appwebsite.js"
+    ></script>
+
+</body>
+
+</html>
