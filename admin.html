@@ -58,14 +58,42 @@
     </div>
 
     <!-- Admin panel -->
-    <div id="adminPanel" class="hidden max-w-4xl mx-auto p-6 space-y-8">
+    <div id="adminPanel" class="hidden max-w-7xl mx-auto p-6 space-y-8">
 
         <div class="flex justify-between items-center">
-            <h1 class="text-2xl font-black">Coupon Manager</h1>
-            <button id="adminSignOutBtn" class="text-sm bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200">
-                Sign Out
-            </button>
+            <div>
+                <h1 class="text-2xl font-black">Admin Dashboard</h1>
+                <p class="text-sm text-gray-500 mt-1">Customers, online orders, and coupons</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="refreshAdminDataBtn" title="Refresh customer and order data" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200" aria-label="Refresh customer and order data">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button id="adminSignOutBtn" class="text-sm bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200">
+                    Sign Out
+                </button>
+            </div>
         </div>
+
+        <!-- Customers -->
+        <section class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-4 gap-4">
+                <div>
+                    <h2 class="font-bold text-lg">Customers</h2>
+                    <p id="customersSummary" class="text-sm text-gray-500"></p>
+                </div>
+            </div>
+            <div id="customersTable" class="space-y-3"></div>
+        </section>
+
+        <!-- Orders -->
+        <section class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <div class="mb-4">
+                <h2 class="font-bold text-lg">Online Orders</h2>
+                <p id="ordersSummary" class="text-sm text-gray-500"></p>
+            </div>
+            <div id="ordersTable" class="space-y-3"></div>
+        </section>
 
         <!-- Create coupon -->
         <form id="couponForm" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 grid gap-4 sm:grid-cols-2">
