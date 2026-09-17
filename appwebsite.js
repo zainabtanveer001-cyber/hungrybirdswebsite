@@ -920,6 +920,8 @@ function renderCartModal() {
 }
 
 // ===== Past Orders =====
+let pastOrdersListener = null;
+
 async function loadPastOrders() {
     if (!currentUser) {
         openModal($("authModal"));
@@ -945,40 +947,45 @@ async function loadPastOrders() {
     openModal($("pastOrdersModal"));
 
     try {
-        // Try with orderBy first (requires Firestore index)
-        let snapshot;
-        try {
-            snapshot = await getDocs(
-                query(
-                    collection(db, "onlineOrders"),
-                    where("customerUid", "==", currentUser.uid),
-                    orderBy("createdAt", "desc")
-                )
-            );
-        } catch (indexError) {
-            console.warn("Firestore index not found, falling back to simple query:", indexError);
-            // Fallback: query without orderBy if index doesn't exist
-            snapshot = await getDocs(
-                query(
-                    collection(db, "onlineOrders"),
-                    where("customerUid", "==", currentUser.uid)
-                )
-            );
+        // Clean up existing listener
+        if (pastOrdersListener) {
+            pastOrdersListener();
+            pastOrdersListener = null;
         }
 
-        pastOrdersCache = snapshot.docs
-            .map(docSnap => ({
-                id: docSnap.id,
-                ...docSnap.data()
-            }))
-            // Sort in memory if we couldn't use orderBy
-            .sort((a, b) => {
-                const timeA = a.createdAt?.toMillis?.() || 0;
-                const timeB = b.createdAt?.toMillis?.() || 0;
-                return timeB - timeA; // Descending order (newest first)
-            });
+        // Set up real-time listener for user's orders
+        pastOrdersListener = onSnapshot(
+            query(
+                collection(db, "onlineOrders"),
+                where("customerUid", "==", currentUser.uid)
+            ),
+            (snapshot) => {
+                pastOrdersCache = snapshot.docs
+                    .map(docSnap => ({
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    }))
+                    .sort((a, b) => {
+                        const timeA = a.createdAt?.toMillis?.() || 0;
+                        const timeB = b.createdAt?.toMillis?.() || 0;
+                        return timeB - timeA;
+                    });
 
-        renderPastOrders();
+                renderPastOrders();
+            },
+            (error) => {
+                console.error("Failed to load past orders:", error);
+
+                list.innerHTML = `
+                    <div class="text-center text-gray-400 py-12">
+                        <p class="font-semibold text-gray-600">Couldn't load your past orders.</p>
+                        <p class="text-sm mt-1">${error.code === 'permission-denied'
+                            ? 'Permission denied. Please contact support.'
+                            : 'Please try again later.'}</p>
+                    </div>
+                `;
+            }
+        );
 
     } catch (error) {
         console.error("Failed to load past orders:", error);
@@ -1018,10 +1025,45 @@ function renderPastOrders() {
             .map(item => `${item.name} × ${item.qty}`)
             .join(", ");
 
+        const status = order.status || "PENDING";
+        const isActive = !["COMPLETED", "REJECTED"].includes(status);
+
         return `
-            <div class="border border-gray-100 rounded-2xl p-4">
+            <div class="border border-gray-100 rounded-2xl p-4 hover:shadow-md transition-shadow">
                 <div class="flex justify-between items-start gap-3">
                     <div class="min-w-0">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="status-badge status-${status.toLowerCase()}">
+                                <i class="fa-solid ${getStatusIcon(status)} mr-1"></i>
+                                ${getStatusLabel(status)}
+                            </span>
+                            ${isActive ? '<span class="text-xs text-orange-500 font-semibold animate-pulse">● Live</span>' : ''}
+                        </div>
+                        <div class="text-xs text-gray-400 mb-1">${escapeHTML(date)}</div>
+                        <div class="text-sm text-gray-700 mt-1">${escapeHTML(itemsSummary)}</div>
+                        ${order.estimatedReadyTime && isActive ? `
+                            <div class="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                                <i class="fa-solid fa-clock"></i>
+                                <span>Ready by ${formatEstimatedTime(order.estimatedReadyTime)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="font-black text-gray-900">Rs. ${Number(order.total || 0).toLocaleString()}</div>
+                        ${!isActive ? `
+                            <button
+                                onclick="repeatOrder('${order.id}')"
+                                class="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-orange-500 transition-colors pressable"
+                            >
+                                Repeat Order
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
                         <div class="text-xs text-gray-400">${escapeHTML(date)}</div>
                         <div class="text-sm text-gray-700 mt-1">${escapeHTML(itemsSummary)}</div>
                         <div class="text-xs font-bold uppercase tracking-wide text-orange-500 mt-1">${escapeHTML(order.status || "")}</div>
@@ -1082,6 +1124,224 @@ window.repeatOrder = (orderId) => {
     closeModal($("pastOrdersModal"));
     openModal($("cartModal"));
 };
+
+// ===== Order Tracking =====
+let activeOrderListener = null;
+
+// Track order by ID (for guest access)
+window.trackOrderByID = async function(orderId) {
+    if (!orderId || !orderId.trim()) {
+        showToast("Please enter an order ID", "fa-circle-exclamation");
+        return;
+    }
+
+    const trackingContent = $("trackingContent");
+    const trackingError = $("trackingError");
+
+    if (!trackingContent || !trackingError) return;
+
+    // Show loading state
+    trackingContent.innerHTML = `
+        <div class="text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
+            <p class="mt-3 text-gray-600">Loading order...</p>
+        </div>
+    `;
+    trackingError.classList.add("hidden");
+
+    try {
+        const orderDoc = await getDoc(doc(db, "onlineOrders", orderId.trim()));
+
+        if (!orderDoc.exists()) {
+            trackingContent.innerHTML = "";
+            trackingError.textContent = "Order not found. Please check your order ID.";
+            trackingError.classList.remove("hidden");
+            return;
+        }
+
+        const orderData = { id: orderDoc.id, ...orderDoc.data() };
+
+        // Set up real-time listener
+        setupOrderTrackingListener(orderId.trim(), orderData);
+
+    } catch (error) {
+        console.error("Error tracking order:", error);
+        trackingContent.innerHTML = "";
+        trackingError.textContent = "Could not load order. Please try again.";
+        trackingError.classList.remove("hidden");
+    }
+};
+
+// Set up real-time Firestore listener
+function setupOrderTrackingListener(orderId, initialData) {
+    // Clean up existing listener
+    if (activeOrderListener) {
+        activeOrderListener();
+        activeOrderListener = null;
+    }
+
+    // Render initial data
+    renderOrderTimeline(initialData);
+
+    // Set up real-time listener
+    activeOrderListener = onSnapshot(
+        doc(db, "onlineOrders", orderId),
+        (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const orderData = { id: docSnapshot.id, ...docSnapshot.data() };
+                renderOrderTimeline(orderData);
+            }
+        },
+        (error) => {
+            console.error("Order tracking listener error:", error);
+        }
+    );
+}
+
+// Render order timeline UI
+function renderOrderTimeline(order) {
+    const trackingContent = $("trackingContent");
+    if (!trackingContent) return;
+
+    const orderType = order.orderType || "DELIVERY";
+    const currentStatus = order.status || "PENDING";
+    const progress = getProgressPercentage(currentStatus, orderType);
+
+    // Define status steps based on order type
+    const allSteps = {
+        'DELIVERY': [
+            { status: 'PENDING', label: 'Order Received', icon: 'fa-clock' },
+            { status: 'ACCEPTED', label: 'Confirmed', icon: 'fa-check-circle' },
+            { status: 'PREPARING', label: 'Preparing', icon: 'fa-fire' },
+            { status: 'READY', label: 'Ready', icon: 'fa-bell' },
+            { status: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', icon: 'fa-truck' },
+            { status: 'COMPLETED', label: 'Delivered', icon: 'fa-circle-check' }
+        ],
+        'TAKEAWAY': [
+            { status: 'PENDING', label: 'Order Received', icon: 'fa-clock' },
+            { status: 'ACCEPTED', label: 'Confirmed', icon: 'fa-check-circle' },
+            { status: 'PREPARING', label: 'Preparing', icon: 'fa-fire' },
+            { status: 'READY', label: 'Ready for Pickup', icon: 'fa-bell' },
+            { status: 'COMPLETED', label: 'Completed', icon: 'fa-circle-check' }
+        ]
+    };
+
+    const steps = allSteps[orderType] || allSteps['DELIVERY'];
+    const currentStepIndex = steps.findIndex(s => s.status === currentStatus);
+
+    // Handle rejected orders
+    if (currentStatus === 'REJECTED') {
+        trackingContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="w-16 h-16 rounded-full bg-red-50 text-red-500 grid place-items-center mx-auto mb-4">
+                    <i class="fa-solid fa-times-circle text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Order Cancelled</h3>
+                <p class="text-gray-600">This order has been cancelled.</p>
+                ${order.rejectionReason ? `<p class="text-sm text-gray-500 mt-2">Reason: ${escapeHTML(order.rejectionReason)}</p>` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    // Build timeline HTML
+    const stepsHTML = steps.map((step, index) => {
+        const isCompleted = index <= currentStepIndex;
+        const isCurrent = index === currentStepIndex;
+        const timestamp = order[`${step.status.toLowerCase()}At`];
+
+        return `
+            <div class="timeline-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}">
+                <div class="flex items-start gap-4">
+                    <div class="timeline-icon ${isCompleted ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}">
+                        <i class="fa-solid ${step.icon}"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-gray-900">${step.label}</div>
+                        ${timestamp ? `<div class="text-xs text-gray-500 mt-1">${formatEstimatedTime(timestamp)}</div>` : ''}
+                    </div>
+                    ${isCurrent ? '<span class="status-pulse"></span>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    trackingContent.innerHTML = `
+        <div class="p-6">
+            <!-- Progress Bar -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Order Progress</span>
+                    <span class="text-sm font-bold text-orange-500">${Math.round(progress)}%</span>
+                </div>
+                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-500" style="width: ${progress}%"></div>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            <div class="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center">
+                        <i class="fa-solid ${getStatusIcon(currentStatus)}"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-orange-600 font-semibold">Current Status</div>
+                        <div class="text-lg font-black text-gray-900">${getStatusLabel(currentStatus)}</div>
+                    </div>
+                </div>
+            </div>
+
+            ${order.estimatedReadyTime ? `
+                <div class="mb-6 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                    <div class="flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-clock text-blue-600"></i>
+                        <span class="text-gray-700">Estimated ready by</span>
+                        <span class="font-bold text-blue-600">${formatEstimatedTime(order.estimatedReadyTime)}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Timeline Steps -->
+            <div class="timeline">
+                ${stepsHTML}
+            </div>
+
+            <!-- Order Details -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <div class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Order Details</div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Order ID</span>
+                        <span class="font-mono text-gray-900">${escapeHTML(order.id)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Type</span>
+                        <span class="font-semibold text-gray-900">${orderType}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Total</span>
+                        <span class="font-bold text-gray-900">Rs. ${Number(order.total || 0).toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Clean up listener when modal closes
+function closeTrackOrderModal() {
+    if (activeOrderListener) {
+        activeOrderListener();
+        activeOrderListener = null;
+    }
+    closeModal($("trackOrderModal"));
+    $("orderIdInput").value = "";
+    $("trackingContent").innerHTML = "";
+    $("trackingError").classList.add("hidden");
+}
+
+window.closeTrackOrderModal = closeTrackOrderModal;
 
 // ===== Order Type =====
 function setOrderType(type) {
@@ -1948,6 +2208,55 @@ async function initMenu() {
     renderFloatingCart();
 
     observeReveals();
+}
+
+// ===== Order Tracking Utilities =====
+
+// Status display labels
+function getStatusLabel(status) {
+    const labels = {
+        'PENDING': 'Order Received',
+        'ACCEPTED': 'Confirmed',
+        'PREPARING': 'Preparing',
+        'READY': 'Ready for Pickup',
+        'OUT_FOR_DELIVERY': 'Out for Delivery',
+        'COMPLETED': 'Completed',
+        'REJECTED': 'Cancelled'
+    };
+    return labels[status] || status;
+}
+
+// Status icons
+function getStatusIcon(status) {
+    const icons = {
+        'PENDING': 'fa-clock',
+        'ACCEPTED': 'fa-check-circle',
+        'PREPARING': 'fa-fire',
+        'READY': 'fa-bell',
+        'OUT_FOR_DELIVERY': 'fa-truck',
+        'COMPLETED': 'fa-circle-check',
+        'REJECTED': 'fa-times-circle'
+    };
+    return icons[status] || 'fa-circle';
+}
+
+// Time formatting
+function formatEstimatedTime(timestamp) {
+    if (!timestamp) return 'Calculating...';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+}
+
+// Calculate progress percentage
+function getProgressPercentage(currentStatus, orderType) {
+    const deliverySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'COMPLETED'];
+    const takeawaySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED'];
+
+    const steps = orderType === 'DELIVERY' ? deliverySteps : takeawaySteps;
+    const currentIndex = steps.indexOf(currentStatus);
+
+    if (currentIndex === -1) return 0;
+    return ((currentIndex + 1) / steps.length) * 100;
 }
 
 // Start website

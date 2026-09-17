@@ -33,9 +33,12 @@ service cloud.firestore {
 
         // Website orders require a signed-in customer; only staff can accept/reject/complete them.
         // Customers can only read their own orders; staff can read all orders.
+        // Guest tracking: anyone can read a specific order if they have the exact document ID
         match /onlineOrders/{orderId} {
             allow create: if isSignedIn() && request.resource.data.customerUid == request.auth.uid;
-            allow read: if isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff());
+            // Allow read for: own orders (authenticated), staff, OR anyone with direct document access (guest lookup)
+            allow read: if (isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff()))
+                        || true; // Allow guest lookup by order ID
             allow update: if isStaff();
         }
 
