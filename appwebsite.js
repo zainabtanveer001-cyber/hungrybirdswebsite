@@ -1065,24 +1065,6 @@ function renderPastOrders() {
         `;
     }).join("");
 }
-                        <div class="text-xs text-gray-400">${escapeHTML(date)}</div>
-                        <div class="text-sm text-gray-700 mt-1">${escapeHTML(itemsSummary)}</div>
-                        <div class="text-xs font-bold uppercase tracking-wide text-orange-500 mt-1">${escapeHTML(order.status || "")}</div>
-                    </div>
-                    <div class="text-right shrink-0">
-                        <div class="font-black text-gray-900">Rs. ${Number(order.total || 0).toLocaleString()}</div>
-                        <button
-                            onclick="repeatOrder('${order.id}')"
-                            class="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-orange-500 transition-colors pressable"
-                        >
-                            Repeat Order
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join("");
-}
 
 window.repeatOrder = (orderId) => {
     const order = pastOrdersCache.find(o => o.id === orderId);
