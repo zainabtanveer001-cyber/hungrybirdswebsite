@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+    match /databases/{database}/documents {
+
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        // Keep this list in sync with ADMIN_EMAILS in adminwebsite.js
+        function isAdmin() {
+            return isSignedIn() && request.auth.token.email in [
+                "owner@hungrybirds.com"
+            ];
+        }
+
+        // Staff accounts have a profile doc keyed by their auth uid (see app.js createEmployee).
+        function isStaff() {
+            return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+        }
+
+        // The customer website needs to display the published POS menu.
+        // POS staff remain responsible for all writes.
+        match /menu/{menuId} {
+            allow read: if true;
+            allow write: if isStaff();
+        }
+
+        match /categories/{categoryId} {
+            allow read: if true;
+            allow write: if isStaff();
+        }
+
+        // Website orders require a signed-in customer; only staff can accept/reject/complete them.
+        // Customers can only read their own orders; staff can read all orders.
+        match /onlineOrders/{orderId} {
+            allow create: if isSignedIn() && request.resource.data.customerUid == request.auth.uid;
+            allow read: if isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff());
+            allow update: if isStaff();
+        }
+
+        // POS-only collections: never touched by the customer website.
+        match /sales/{saleId} {
+            allow read, write: if isStaff();
+        }
+
+        match /inventory/{itemId} {
+            allow read, write: if isStaff();
+        }
+
+        // Public username -> auth email lookup used by the POS login screen before the
+        // employee is signed in. Deliberately excludes role/displayName/PII.
+        match /usernameDirectory/{usernameLower} {
+            allow read: if true;
+            allow write: if isAdmin();
+        }
+
+        // Per-customer loyalty tracking (orderCount) and staff profile docs (keyed by uid).
+        // Admin can look up/manage any profile; staff-provisioning writes go through the Owner Admin panel.
+        match /users/{userId} {
+            allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+            allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        }
+
+        // Coupons: admins manage promo codes; customers can only self-issue/consume
+        // their own auto-generated 10%-off loyalty coupon under tightly scoped conditions.
+        match /coupons/{couponId} {
+            allow read: if isSignedIn();
+
+            allow create: if isAdmin()
+                || (
+                    isSignedIn() &&
+                    request.resource.data.type == "loyalty" &&
+                    request.resource.data.assignedTo == request.auth.uid &&
+                    request.resource.data.discountPercent == 10 &&
+                    request.resource.data.singleUse == true &&
+                    request.resource.data.used == false &&
+                    request.resource.data.active == true
+                );
+
+            allow update: if isAdmin()
+                || (
+                    isSignedIn() &&
+                    (resource.data.assignedTo == request.auth.uid || resource.data.assignedTo == null) &&
+                    request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(["active", "used", "usedCount"])
+                );
+
+            allow delete: if isAdmin();
+        }
+    }
+}

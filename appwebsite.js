@@ -945,18 +945,38 @@ async function loadPastOrders() {
     openModal($("pastOrdersModal"));
 
     try {
-        const snapshot = await getDocs(
-            query(
-                collection(db, "onlineOrders"),
-                where("customerUid", "==", currentUser.uid),
-                orderBy("createdAt", "desc")
-            )
-        );
+        // Try with orderBy first (requires Firestore index)
+        let snapshot;
+        try {
+            snapshot = await getDocs(
+                query(
+                    collection(db, "onlineOrders"),
+                    where("customerUid", "==", currentUser.uid),
+                    orderBy("createdAt", "desc")
+                )
+            );
+        } catch (indexError) {
+            console.warn("Firestore index not found, falling back to simple query:", indexError);
+            // Fallback: query without orderBy if index doesn't exist
+            snapshot = await getDocs(
+                query(
+                    collection(db, "onlineOrders"),
+                    where("customerUid", "==", currentUser.uid)
+                )
+            );
+        }
 
-        pastOrdersCache = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data()
-        }));
+        pastOrdersCache = snapshot.docs
+            .map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            }))
+            // Sort in memory if we couldn't use orderBy
+            .sort((a, b) => {
+                const timeA = a.createdAt?.toMillis?.() || 0;
+                const timeB = b.createdAt?.toMillis?.() || 0;
+                return timeB - timeA; // Descending order (newest first)
+            });
 
         renderPastOrders();
 
@@ -966,7 +986,9 @@ async function loadPastOrders() {
         list.innerHTML = `
             <div class="text-center text-gray-400 py-12">
                 <p class="font-semibold text-gray-600">Couldn't load your past orders.</p>
-                <p class="text-sm mt-1">Please try again.</p>
+                <p class="text-sm mt-1">${error.code === 'permission-denied'
+                    ? 'Permission denied. Please contact support.'
+                    : 'Please try again later.'}</p>
             </div>
         `;
     }
