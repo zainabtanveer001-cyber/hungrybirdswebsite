@@ -1190,22 +1190,23 @@ function renderOrderTimeline(order) {
     const currentStatus = order.status || "PENDING";
     const progress = getProgressPercentage(currentStatus, orderType);
 
-    // Define status steps based on order type
+    // Define status steps based on order type.
+    // Delivery: PENDING → ACCEPTED → PREPARING → OUT_FOR_DELIVERY → COMPLETED
+    // Takeaway: PENDING → ACCEPTED → PREPARING → COMPLETED
+    // (READY step removed — POS does not write that status)
     const allSteps = {
         'DELIVERY': [
-            { status: 'PENDING', label: 'Order Received', icon: 'fa-clock' },
-            { status: 'ACCEPTED', label: 'Confirmed', icon: 'fa-check-circle' },
-            { status: 'PREPARING', label: 'Preparing', icon: 'fa-fire' },
-            { status: 'READY', label: 'Ready', icon: 'fa-bell' },
-            { status: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', icon: 'fa-truck' },
-            { status: 'COMPLETED', label: 'Delivered', icon: 'fa-circle-check' }
+            { status: 'PENDING',          label: 'Order Placed',     icon: 'fa-clock' },
+            { status: 'ACCEPTED',         label: 'Order Confirmed',  icon: 'fa-check-circle' },
+            { status: 'PREPARING',        label: 'Being Prepared',   icon: 'fa-fire' },
+            { status: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', icon: 'fa-motorcycle' },
+            { status: 'COMPLETED',        label: 'Delivered',        icon: 'fa-circle-check' }
         ],
         'TAKEAWAY': [
-            { status: 'PENDING', label: 'Order Received', icon: 'fa-clock' },
-            { status: 'ACCEPTED', label: 'Confirmed', icon: 'fa-check-circle' },
-            { status: 'PREPARING', label: 'Preparing', icon: 'fa-fire' },
-            { status: 'READY', label: 'Ready for Pickup', icon: 'fa-bell' },
-            { status: 'COMPLETED', label: 'Completed', icon: 'fa-circle-check' }
+            { status: 'PENDING',   label: 'Order Placed',      icon: 'fa-clock' },
+            { status: 'ACCEPTED',  label: 'Order Confirmed',   icon: 'fa-check-circle' },
+            { status: 'PREPARING', label: 'Being Prepared',    icon: 'fa-fire' },
+            { status: 'COMPLETED', label: 'Ready for Pickup',  icon: 'fa-circle-check' }
         ]
     };
 
@@ -1700,17 +1701,17 @@ $("cartBtn")?.addEventListener(
 // Track Order button
 $("trackOrderBtn")?.addEventListener(
     "click",
-    async () => {
+    () => {
         openModal($("trackOrderModal"));
 
         if (currentUser) {
             // Auto-track the most recent active order for logged-in users
-            await autoTrackActiveOrder();
+            autoTrackActiveOrder();
         }
     }
 );
 
-async function autoTrackActiveOrder() {
+function autoTrackActiveOrder() {
     const trackingContent = $("trackingContent");
     const trackingError = $("trackingError");
     const idInputSection = $("trackOrderIdSection");
@@ -1729,44 +1730,50 @@ async function autoTrackActiveOrder() {
     // Hide the manual ID input — not needed for logged-in users
     if (idInputSection) idInputSection.classList.add("hidden");
 
-    try {
-        const snapshot = await getDocs(
-            query(
-                collection(db, "onlineOrders"),
-                where("customerUid", "==", currentUser.uid)
-            )
-        );
-
-        const allOrders = snapshot.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-
-        const activeOrder = allOrders.find(
-            o => !["COMPLETED", "REJECTED"].includes(o.status || "PENDING")
-        );
-
-        if (!activeOrder) {
-            trackingContent.innerHTML = `
-                <div class="text-center py-12 text-gray-400">
-                    <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-400"></i>
-                    <p class="font-semibold text-gray-600">No active orders right now.</p>
-                    <p class="text-sm mt-1">Place an order and track it here in real time.</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Set up live tracking for the active order
-        setupOrderTrackingListener(activeOrder.id, activeOrder);
-
-    } catch (error) {
-        console.error("Auto-track error:", error);
-        trackingContent.innerHTML = "";
-        if (trackingError) {
-            trackingError.textContent = "Could not load your order. Please try again.";
-            trackingError.classList.remove("hidden");
-        }
+    // Clean up any existing listener first
+    if (activeOrderListener) {
+        activeOrderListener();
+        activeOrderListener = null;
     }
+
+    // Use onSnapshot so we always get fresh server data and react to
+    // any status change the POS makes in real time
+    activeOrderListener = onSnapshot(
+        query(
+            collection(db, "onlineOrders"),
+            where("customerUid", "==", currentUser.uid)
+        ),
+        (snapshot) => {
+            const allOrders = snapshot.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+
+            const activeOrder = allOrders.find(
+                o => !["COMPLETED", "REJECTED"].includes(o.status || "PENDING")
+            );
+
+            if (!activeOrder) {
+                trackingContent.innerHTML = `
+                    <div class="text-center py-12 text-gray-400">
+                        <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-400"></i>
+                        <p class="font-semibold text-gray-600">No active orders right now.</p>
+                        <p class="text-sm mt-1">Place an order and track it here in real time.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            renderOrderTimeline(activeOrder);
+        },
+        (error) => {
+            console.error("Auto-track error:", error);
+            trackingContent.innerHTML = "";
+            if (trackingError) {
+                trackingError.textContent = "Could not load your order. Please try again.";
+                trackingError.classList.remove("hidden");
+            }
+        }
+    );
 }
 
 // ===== Mobile Bottom Nav =====
@@ -2287,13 +2294,12 @@ async function initMenu() {
 // Status display labels
 function getStatusLabel(status) {
     const labels = {
-        'PENDING': 'Order Received',
-        'ACCEPTED': 'Confirmed',
-        'PREPARING': 'Preparing',
-        'READY': 'Ready for Pickup',
+        'PENDING':          'Order Placed',
+        'ACCEPTED':         'Order Confirmed',
+        'PREPARING':        'Being Prepared',
         'OUT_FOR_DELIVERY': 'Out for Delivery',
-        'COMPLETED': 'Completed',
-        'REJECTED': 'Cancelled'
+        'COMPLETED':        'Delivered',
+        'REJECTED':         'Cancelled'
     };
     return labels[status] || status;
 }
@@ -2301,13 +2307,12 @@ function getStatusLabel(status) {
 // Status icons
 function getStatusIcon(status) {
     const icons = {
-        'PENDING': 'fa-clock',
-        'ACCEPTED': 'fa-check-circle',
-        'PREPARING': 'fa-fire',
-        'READY': 'fa-bell',
-        'OUT_FOR_DELIVERY': 'fa-truck',
-        'COMPLETED': 'fa-circle-check',
-        'REJECTED': 'fa-times-circle'
+        'PENDING':          'fa-clock',
+        'ACCEPTED':         'fa-check-circle',
+        'PREPARING':        'fa-fire',
+        'OUT_FOR_DELIVERY': 'fa-motorcycle',
+        'COMPLETED':        'fa-circle-check',
+        'REJECTED':         'fa-times-circle'
     };
     return icons[status] || 'fa-circle';
 }
@@ -2320,9 +2325,11 @@ function formatEstimatedTime(timestamp) {
 }
 
 // Calculate progress percentage
+// Delivery:  PENDING → ACCEPTED → PREPARING → OUT_FOR_DELIVERY → COMPLETED
+// Takeaway:  PENDING → ACCEPTED → PREPARING → COMPLETED
 function getProgressPercentage(currentStatus, orderType) {
-    const deliverySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'COMPLETED'];
-    const takeawaySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED'];
+    const deliverySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED'];
+    const takeawaySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'COMPLETED'];
 
     const steps = orderType === 'DELIVERY' ? deliverySteps : takeawaySteps;
     const currentIndex = steps.indexOf(currentStatus);
