@@ -1320,8 +1320,15 @@ function closeTrackOrderModal() {
     }
     closeModal($("trackOrderModal"));
     $("orderIdInput").value = "";
-    $("trackingContent").innerHTML = "";
+    $("trackingContent").innerHTML = `
+        <div class="text-center py-12 text-gray-400">
+            <i class="fa-solid fa-magnifying-glass text-3xl mb-3"></i>
+            <p class="font-semibold">Enter your order ID to track</p>
+        </div>
+    `;
     $("trackingError").classList.add("hidden");
+    // Restore the ID input section for guests / next open
+    $("trackOrderIdSection")?.classList.remove("hidden");
 }
 
 window.closeTrackOrderModal = closeTrackOrderModal;
@@ -1370,6 +1377,11 @@ function setOrderType(type) {
 // ===== POS Order Integration =====
 const pushOrderToPOS = async (orderData) => {
     try {
+        console.log("Attempting to create order with data:", {
+            customerUid: orderData.customerUid,
+            status: "PENDING",
+            currentUser: currentUser ? currentUser.uid : "NO USER"
+        });
 
         await addDoc(
             collection(db, "onlineOrders"),
@@ -1381,13 +1393,18 @@ const pushOrderToPOS = async (orderData) => {
             }
         );
 
+        console.log("Order created successfully!");
         return true;
 
     } catch (error) {
 
         console.error(
             "POS Integration Error:",
-            error
+            error,
+            "Error code:",
+            error.code,
+            "Error message:",
+            error.message
         );
 
         showToast(
@@ -1683,10 +1700,74 @@ $("cartBtn")?.addEventListener(
 // Track Order button
 $("trackOrderBtn")?.addEventListener(
     "click",
-    () => {
+    async () => {
         openModal($("trackOrderModal"));
+
+        if (currentUser) {
+            // Auto-track the most recent active order for logged-in users
+            await autoTrackActiveOrder();
+        }
     }
 );
+
+async function autoTrackActiveOrder() {
+    const trackingContent = $("trackingContent");
+    const trackingError = $("trackingError");
+    const idInputSection = $("trackOrderIdSection");
+
+    if (!trackingContent) return;
+
+    // Show loading
+    trackingContent.innerHTML = `
+        <div class="text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
+            <p class="mt-3 text-gray-600">Looking for your active order...</p>
+        </div>
+    `;
+    trackingError?.classList.add("hidden");
+
+    // Hide the manual ID input — not needed for logged-in users
+    if (idInputSection) idInputSection.classList.add("hidden");
+
+    try {
+        const snapshot = await getDocs(
+            query(
+                collection(db, "onlineOrders"),
+                where("customerUid", "==", currentUser.uid)
+            )
+        );
+
+        const allOrders = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+
+        const activeOrder = allOrders.find(
+            o => !["COMPLETED", "REJECTED"].includes(o.status || "PENDING")
+        );
+
+        if (!activeOrder) {
+            trackingContent.innerHTML = `
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-400"></i>
+                    <p class="font-semibold text-gray-600">No active orders right now.</p>
+                    <p class="text-sm mt-1">Place an order and track it here in real time.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Set up live tracking for the active order
+        setupOrderTrackingListener(activeOrder.id, activeOrder);
+
+    } catch (error) {
+        console.error("Auto-track error:", error);
+        trackingContent.innerHTML = "";
+        if (trackingError) {
+            trackingError.textContent = "Could not load your order. Please try again.";
+            trackingError.classList.remove("hidden");
+        }
+    }
+}
 
 // ===== Mobile Bottom Nav =====
 $("bottomNavHome")?.addEventListener(

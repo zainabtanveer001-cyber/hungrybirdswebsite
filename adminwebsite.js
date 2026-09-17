@@ -16,7 +16,8 @@ import {
     deleteDoc,
     query,
     where,
-    serverTimestamp
+    serverTimestamp,
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -89,7 +90,47 @@ onAuthStateChanged(auth, async (user) => {
 
     showScreen("adminPanel");
     await Promise.all([loadCoupons(), loadCustomerData()]);
+    startNewOrderListener();
 });
+
+// ===== New Order Notification Sound =====
+const newOrderSound = new Audio("mixkit-software-interface-start-2574.wav");
+newOrderSound.preload = "auto";
+
+let newOrderListener = null;
+const seenOrderIds = new Set();
+
+function startNewOrderListener() {
+    // Avoid duplicate listeners on re-auth
+    if (newOrderListener) {
+        newOrderListener();
+        newOrderListener = null;
+    }
+
+    // Seed seen IDs with current orders so we don't fire on page load
+    getDocs(collection(db, "onlineOrders")).then(snapshot => {
+        snapshot.docs.forEach(d => seenOrderIds.add(d.id));
+
+        // Now start listening — only orders added after this point are "new"
+        newOrderListener = onSnapshot(
+            collection(db, "onlineOrders"),
+            (snapshot) => {
+                snapshot.docChanges().forEach(change => {
+                    if (
+                        change.type === "added" &&
+                        !seenOrderIds.has(change.doc.id)
+                    ) {
+                        seenOrderIds.add(change.doc.id);
+                        newOrderSound.currentTime = 0;
+                        newOrderSound.play().catch(() => {
+                            // Autoplay blocked until first user interaction — silently ignored
+                        });
+                    }
+                });
+            }
+        );
+    });
+}
 
 $("adminLoginForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();

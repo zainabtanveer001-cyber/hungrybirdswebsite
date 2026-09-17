@@ -61,7 +61,7 @@ service cloud.firestore {
         // Per-customer loyalty tracking (orderCount) and staff profile docs (keyed by uid).
         // Admin can look up/manage any profile; staff-provisioning writes go through the Owner Admin panel.
         match /users/{userId} {
-            allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+            allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isStaff());
             allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
         }
 
