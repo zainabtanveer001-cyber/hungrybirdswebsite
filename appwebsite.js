@@ -20,7 +20,8 @@ import {
     query,
     where,
     orderBy,
-    serverTimestamp
+    serverTimestamp,
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Same Firebase project as the POS
@@ -1694,6 +1695,14 @@ $("cartBtn")?.addEventListener(
         openModal(
             $("cartModal")
         );
+    }
+);
+
+// Track Order button
+$("trackOrderBtn")?.addEventListener(
+    "click",
+    () => {
+        openModal($("trackOrderModal"));
     }
 );
 
