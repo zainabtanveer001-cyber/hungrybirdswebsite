@@ -429,11 +429,16 @@ function renderMenu(items) {
             menu-card
             reveal
             bg-white
-            rounded-3xl
-            shadow-soft
+            rounded-[2rem]
+            shadow-[0_4px_30px_-12px_rgba(15,23,42,0.1)]
             overflow-hidden
             border
-            border-gray-100
+            border-gray-100/60
+            hover:-translate-y-1
+            hover:shadow-[0_12px_40px_-12px_rgba(15,23,42,0.15)]
+            transition-all
+            duration-300
+            ease-out
         `;
 
         card.style.transitionDelay =
@@ -445,40 +450,32 @@ function renderMenu(items) {
             )?.name || "";
 
         card.innerHTML = `
-            <div class="relative overflow-hidden bg-gray-100">
-
+            <div class="relative overflow-hidden bg-gray-50">
                 <img
                     src="${escapeHTML(item.img)}"
                     alt="${escapeHTML(item.name)}"
                     loading="lazy"
                     decoding="async"
-                    class="w-full h-48 object-cover"
+                    class="w-full h-52 object-cover"
                 >
-
-                <div class="absolute left-3 top-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-black uppercase tracking-widest text-orange-600 shadow-sm">
-                    ${escapeHTML(categoryName)}
-                </div>
-
+                ${categoryName ? `
+                    <div class="absolute left-4 top-4 px-3 py-1 rounded-full bg-white/80 backdrop-blur-sm text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600">
+                        ${escapeHTML(categoryName)}
+                    </div>
+                ` : ""}
             </div>
-
-            <div class="p-5">
-
-                <h3 class="text-lg font-black text-gray-900 leading-tight min-h-[2.8rem]">
+            <div class="px-5 pt-4 pb-5">
+                <h3 class="text-[15px] font-semibold text-gray-800 leading-snug tracking-tight min-h-[2.4rem]">
                     ${escapeHTML(item.name)}
                 </h3>
-
-                <div class="flex justify-between items-center mt-5">
-
-                    <span class="text-xl font-black text-gray-900">
+                <div class="flex justify-between items-center mt-4">
+                    <span class="text-lg font-semibold text-gray-900 tracking-tight">
                         Rs. ${Number(item.price).toLocaleString()}
                     </span>
-
                     <div id="qtyBox-${item.id}">
                         ${cardControlsHTML(item.id)}
                     </div>
-
                 </div>
-
             </div>
         `;
 
