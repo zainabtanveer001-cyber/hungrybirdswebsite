@@ -2035,6 +2035,128 @@ $("closePastOrdersModal")?.addEventListener(
     }
 );
 
+// ===== My Coupons =====
+async function loadMyCoupons() {
+    if (!currentUser) return;
+    const content = $("myCouponsContent");
+    if (!content) return;
+
+    content.innerHTML = `
+        <div class="text-center py-12 text-gray-400">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mb-3"></i>
+            <p>Loading your coupons…</p>
+        </div>
+    `;
+    openModal($("myCouponsModal"));
+
+    try {
+        const uid = currentUser.uid;
+        const [userSnap, couponsSnap, ordersSnap] = await Promise.all([
+            getDoc(doc(db, "users", uid)),
+            getDocs(query(collection(db, "coupons"), where("assignedTo", "==", uid))),
+            getDocs(query(collection(db, "onlineOrders"), where("customerUid", "==", uid)))
+        ]);
+
+        const orderCount = userSnap.data()?.orderCount ?? 0;
+        const coupons = couponsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const couponOrders = ordersSnap.docs
+            .map(d => d.data())
+            .filter(o => o.couponCode && o.discountAmount > 0);
+
+        renderMyCoupons(orderCount, coupons, couponOrders);
+    } catch (err) {
+        console.error("loadMyCoupons error:", err);
+        content.innerHTML = `<div class="text-center py-12 text-red-400"><p>Could not load coupons. Please try again.</p></div>`;
+    }
+}
+
+function renderMyCoupons(orderCount, coupons, couponOrders) {
+    const content = $("myCouponsContent");
+    if (!content) return;
+
+    const progress = orderCount % 10;
+    const ordersLeft = 10 - progress;
+    const pct = (progress / 10) * 100;
+
+    const activeCoupons = coupons.filter(c => c.active && !c.used);
+    const usedCoupons = coupons.filter(c => !c.active || c.used);
+    const totalSaved = couponOrders.reduce((sum, o) => sum + (Number(o.discountAmount) || 0), 0);
+
+    const progressHTML = `
+        <div class="bg-orange-50 border border-orange-100 rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center shrink-0">
+                    <i class="fa-solid fa-star"></i>
+                </div>
+                <div>
+                    <div class="font-bold text-gray-900">Loyalty Reward Progress</div>
+                    <div class="text-sm text-gray-500">Every 10 orders earns a 10% off coupon</div>
+                </div>
+            </div>
+            <div class="flex justify-between text-sm font-semibold text-gray-700 mb-1">
+                <span>${progress} / 10 orders</span>
+                <span>${ordersLeft === 0 ? "Coupon earned!" : ordersLeft + " more to go"}</span>
+            </div>
+            <div class="h-3 bg-white rounded-full overflow-hidden border border-orange-100">
+                <div class="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500" style="width:${pct}%"></div>
+            </div>
+        </div>
+    `;
+
+    const activeCouponsHTML = activeCoupons.length ? activeCoupons.map(c => `
+        <div class="flex items-center justify-between border border-green-100 bg-green-50 rounded-2xl px-4 py-3 gap-3">
+            <div>
+                <div class="font-mono font-bold text-gray-900 text-sm">${escapeHTML(c.id)}</div>
+                <div class="text-xs text-green-700 font-semibold mt-0.5">${c.discountPercent}% off — Ready to use</div>
+            </div>
+            <button
+                onclick="navigator.clipboard.writeText('${escapeHTML(c.id)}').then(()=>showToast('Coupon code copied!','fa-copy'))"
+                class="text-xs bg-green-600 text-white px-3 py-1.5 rounded-full hover:bg-green-700 transition-colors pressable shrink-0"
+            >
+                <i class="fa-solid fa-copy mr-1"></i>Copy
+            </button>
+        </div>
+    `).join("") : `<p class="text-sm text-gray-400 text-center py-3">No active coupons right now.</p>`;
+
+    const historyHTML = usedCoupons.length ? usedCoupons.map(c => {
+        const saved = couponOrders.find(o => o.couponCode === c.id);
+        return `
+        <div class="flex items-center justify-between border border-gray-100 rounded-2xl px-4 py-3 gap-3">
+            <div>
+                <div class="font-mono font-bold text-gray-500 text-sm line-through">${escapeHTML(c.id)}</div>
+                <div class="text-xs text-gray-400 mt-0.5">${c.discountPercent}% off${saved ? ` — saved Rs. ${Number(saved.discountAmount).toLocaleString()}` : ""}</div>
+            </div>
+            <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-semibold">Used</span>
+        </div>
+    `}).join("") : `<p class="text-sm text-gray-400 text-center py-3">No coupon history yet.</p>`;
+
+    const totalHTML = totalSaved > 0 ? `
+        <div class="flex items-center justify-between bg-gray-900 text-white rounded-2xl px-5 py-4">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-piggy-bank text-orange-400"></i>
+                <span class="font-semibold">Total saved with coupons</span>
+            </div>
+            <span class="font-black text-orange-400 text-lg">Rs. ${totalSaved.toLocaleString()}</span>
+        </div>
+    ` : "";
+
+    content.innerHTML = `
+        ${progressHTML}
+        ${totalHTML}
+        <div>
+            <div class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Active Coupons</div>
+            <div class="space-y-2">${activeCouponsHTML}</div>
+        </div>
+        <div>
+            <div class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Coupon History</div>
+            <div class="space-y-2">${historyHTML}</div>
+        </div>
+    `;
+}
+
+$("myCouponsBtn")?.addEventListener("click", loadMyCoupons);
+$("closeMyCouponsModal")?.addEventListener("click", () => closeModal($("myCouponsModal")));
+
 // Apply coupon
 $("applyCouponBtn")?.addEventListener(
     "click",
@@ -2045,7 +2167,8 @@ $("applyCouponBtn")?.addEventListener(
 [
     $("authModal"),
     $("cartModal"),
-    $("pastOrdersModal")
+    $("pastOrdersModal"),
+    $("myCouponsModal")
 ].forEach(modal => {
 
     if (!modal) return;
@@ -2099,6 +2222,16 @@ document.addEventListener(
         ) {
             closeModal(
                 $("pastOrdersModal")
+            );
+        }
+
+        if (
+            $("myCouponsModal")?.classList.contains(
+                "is-open"
+            )
+        ) {
+            closeModal(
+                $("myCouponsModal")
             );
         }
     }
