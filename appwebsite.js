@@ -1236,11 +1236,11 @@ function renderOrderTimeline(order) {
 
         return `
             <div class="timeline-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}">
-                <div class="flex items-start gap-4">
-                    <div class="timeline-icon ${isCompleted ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}">
-                        <i class="fa-solid ${step.icon}"></i>
-                    </div>
-                    <div class="flex-1">
+                <div class="timeline-icon ${isCompleted ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}">
+                    <i class="fa-solid ${step.icon}"></i>
+                </div>
+                <div class="flex items-start justify-between">
+                    <div>
                         <div class="font-bold text-gray-900">${step.label}</div>
                         ${timestamp ? `<div class="text-xs text-gray-500 mt-1">${formatEstimatedTime(timestamp)}</div>` : ''}
                     </div>
