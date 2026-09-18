@@ -1365,6 +1365,8 @@ function setOrderType(type) {
         addressInput.classList.remove("hidden");
         addressInput.required = true;
 
+        $("deliveryInfoNote")?.classList.remove("hidden");
+
     } else {
 
         takeawayBtn.className = active;
@@ -1372,6 +1374,8 @@ function setOrderType(type) {
 
         addressInput.classList.add("hidden");
         addressInput.required = false;
+
+        $("deliveryInfoNote")?.classList.add("hidden");
     }
 }
 
@@ -1475,6 +1479,14 @@ async function placeOrder() {
             "fa-location-dot"
         );
 
+        return;
+    }
+
+    if (currentOrderType === "DELIVERY" && getCartSubtotal() < 500) {
+        showToast(
+            "Minimum order for delivery is Rs. 500.",
+            "fa-circle-exclamation"
+        );
         return;
     }
 
@@ -2037,7 +2049,10 @@ $("closePastOrdersModal")?.addEventListener(
 
 // ===== My Coupons =====
 async function loadMyCoupons() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        openModal($("authModal"));
+        return;
+    }
     const content = $("myCouponsContent");
     if (!content) return;
 
@@ -2156,6 +2171,11 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
 
 $("myCouponsBtn")?.addEventListener("click", loadMyCoupons);
 $("closeMyCouponsModal")?.addEventListener("click", () => closeModal($("myCouponsModal")));
+
+// Fallback: delegation for myCouponsBtn in case it was hidden at load time
+document.addEventListener("click", (e) => {
+    if (e.target.closest("#myCouponsBtn")) loadMyCoupons();
+});
 
 // Apply coupon
 $("applyCouponBtn")?.addEventListener(
