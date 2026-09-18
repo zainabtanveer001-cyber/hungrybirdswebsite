@@ -20,6 +20,7 @@ import {
     query,
     where,
     orderBy,
+    limit,
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -954,23 +955,20 @@ async function loadPastOrders() {
             pastOrdersListener = null;
         }
 
-        // Set up real-time listener for user's orders
+        // Set up real-time listener for user's orders (limit to 20 most recent)
         pastOrdersListener = onSnapshot(
             query(
                 collection(db, "onlineOrders"),
-                where("customerUid", "==", currentUser.uid)
+                where("customerUid", "==", currentUser.uid),
+                orderBy("createdAt", "desc"),
+                limit(20)
             ),
             (snapshot) => {
                 pastOrdersCache = snapshot.docs
                     .map(docSnap => ({
                         id: docSnap.id,
                         ...docSnap.data()
-                    }))
-                    .sort((a, b) => {
-                        const timeA = a.createdAt?.toMillis?.() || 0;
-                        const timeB = b.createdAt?.toMillis?.() || 0;
-                        return timeB - timeA;
-                    });
+                    }));
 
                 renderPastOrders();
             },
@@ -2041,6 +2039,10 @@ $("pastOrdersBtn")?.addEventListener(
 $("closePastOrdersModal")?.addEventListener(
     "click",
     () => {
+        if (pastOrdersListener) {
+            pastOrdersListener();
+            pastOrdersListener = null;
+        }
         closeModal(
             $("pastOrdersModal")
         );
