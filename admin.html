@@ -163,6 +163,72 @@
             <div id="couponsTable" class="space-y-2"></div>
         </div>
 
+        <!-- Banner Management -->
+        <form id="bannerForm" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 grid gap-4 sm:grid-cols-2">
+            <h2 class="sm:col-span-2 font-bold text-lg">Create Banner</h2>
+
+            <input
+                type="text"
+                id="bannerImageUrlField"
+                placeholder="Image URL"
+                required
+                class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+            >
+
+            <input
+                type="text"
+                id="bannerTitleField"
+                placeholder="Title"
+                required
+                class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+            >
+
+            <input
+                type="text"
+                id="bannerDescriptionField"
+                placeholder="Description"
+                class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+            >
+
+            <input
+                type="text"
+                id="bannerLinkField"
+                placeholder="Link/URL (optional)"
+                class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+            >
+
+            <select
+                id="bannerTypeField"
+                class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+            >
+                <option value="deal">Deal</option>
+                <option value="discount">Discount</option>
+                <option value="catalogue">Catalogue</option>
+                <option value="promo">Promo</option>
+            </select>
+
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="bannerActiveField" checked class="w-5 h-5 accent-orange-500">
+                <label for="bannerActiveField" class="text-sm font-medium">Active</label>
+            </div>
+
+            <button
+                type="submit"
+                class="sm:col-span-2 bg-orange-500 text-white font-bold py-3 rounded-2xl hover:bg-orange-600 transition-colors"
+            >
+                Create Banner
+            </button>
+
+            <p id="bannerFormMessage" class="sm:col-span-2 text-sm hidden"></p>
+        </form>
+
+        <!-- Existing Banners -->
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <h2 class="font-bold text-lg mb-4">Existing Banners</h2>
+
+            <div id="bannersTable" class="space-y-2"></div>
+        </div>
+
     </div>
 
     <script type="module" src="adminwebsite.js"></script>

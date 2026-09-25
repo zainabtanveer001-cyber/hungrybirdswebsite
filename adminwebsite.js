@@ -89,7 +89,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     showScreen("adminPanel");
-    await Promise.all([loadCoupons(), loadCustomerData()]);
+    await Promise.all([loadCoupons(), loadCustomerData(), loadBanners()]);
     startNewOrderListener();
 });
 
@@ -427,3 +427,107 @@ async function loadCoupons() {
         container.innerHTML = `<p class="text-red-500 text-sm">Could not load coupons.</p>`;
     }
 }
+
+// ===== Banner Management =====
+async function loadBanners() {
+    const container = $("bannersTable");
+
+    if (!container) return;
+
+    container.innerHTML = `<div class="text-center text-gray-400 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+
+    try {
+        const snapshot = await getDocs(collection(db, "banners"));
+
+        if (snapshot.empty) {
+            container.innerHTML = `<p class="text-gray-400 text-sm">No banners yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+
+            return `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border border-gray-100 rounded-2xl p-3 gap-3">
+                    <div class="flex-1">
+                        <div class="font-bold text-sm">${escapeHTML(data.title)}</div>
+                        <div class="text-xs text-gray-500">${escapeHTML(data.description || "No description")}</div>
+                        <div class="text-xs text-gray-400 mt-1">${data.type} · ${data.imageUrl ? "Image set" : "No image"}</div>
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button data-id="${docSnap.id}" data-active="${data.active}" class="toggle-banner text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"} flex-1 sm:flex-none">
+                            ${data.active ? "Active" : "Inactive"}
+                        </button>
+                        <button data-id="${docSnap.id}" class="delete-banner w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        container.querySelectorAll(".toggle-banner").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.dataset.id;
+                const nowActive = btn.dataset.active === "true";
+
+                await updateDoc(doc(db, "banners", id), { active: !nowActive });
+                await loadBanners();
+            });
+        });
+
+        container.querySelectorAll(".delete-banner").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                await deleteDoc(doc(db, "banners", btn.dataset.id));
+                await loadBanners();
+            });
+        });
+
+    } catch (error) {
+        console.error("Failed to load banners:", error);
+        container.innerHTML = `<p class="text-red-500 text-sm">Could not load banners.</p>`;
+    }
+}
+
+$("bannerForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const imageUrl = $("bannerImageUrlField").value.trim();
+    const title = $("bannerTitleField").value.trim();
+    const description = $("bannerDescriptionField").value.trim();
+    const link = $("bannerLinkField").value.trim();
+    const type = $("bannerTypeField").value;
+    const active = $("bannerActiveField").checked;
+
+    if (!imageUrl || !title) {
+        setFormMessage("bannerFormMessage", "Image URL and title are required.");
+        $("bannerFormMessage").classList.remove("hidden");
+        return;
+    }
+
+    try {
+        const bannerId = `banner_${Date.now()}`;
+
+        await setDoc(doc(db, "banners", bannerId), {
+            imageUrl,
+            title,
+            description,
+            link,
+            type,
+            active,
+            order: 0,
+            createdAt: serverTimestamp()
+        });
+
+        setFormMessage("bannerFormMessage", "Banner created successfully.", false);
+        $("bannerFormMessage").classList.remove("hidden");
+        $("bannerForm").reset();
+
+        await loadBanners();
+
+    } catch (error) {
+        console.error("Banner creation error:", error);
+        setFormMessage("bannerFormMessage", "Could not create banner.");
+        $("bannerFormMessage").classList.remove("hidden");
+    }
+});
