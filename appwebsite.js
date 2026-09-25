@@ -48,9 +48,37 @@ let currentOrderType = "DELIVERY";
 let toastTimer = null;
 let appliedCoupon = null;
 let pastOrdersCache = [];
+let pastOrdersListener = null;
+let activeOrderListener = null;
 
 let categories = [{ id: "ALL", name: "All" }];
 let menuItems = [];
+
+// ===== Cart Persistence (localStorage) =====
+function loadCart() {
+    try {
+        const savedCart = localStorage.getItem("hungryBirdsCart");
+        if (savedCart) {
+            cart = JSON.parse(savedCart);
+        }
+    } catch (e) {
+        console.warn("Failed to load cart from localStorage:", e);
+    }
+}
+loadCart();
+
+function saveCart() {
+    try {
+        localStorage.setItem("hungryBirdsCart", JSON.stringify(cart));
+    } catch (e) {
+        console.warn("Failed to save cart to localStorage:", e);
+    }
+}
+
+function clearCart() {
+    cart = [];
+    localStorage.removeItem("hungryBirdsCart");
+}
 
 // ===== Small UI Helpers =====
 const $ = (id) => document.getElementById(id);
@@ -700,6 +728,7 @@ window.addToCart = (id) => {
     renderCardControls(id);
     renderFloatingCart();
     animateCartButton();
+    saveCart();
 
     showToast(
         `${item.name} added to cart`,
@@ -721,6 +750,7 @@ window.removeFromCart = (id) => {
     updateCartCount();
     renderCardControls(id);
     renderFloatingCart();
+    saveCart();
 
     if (removed) {
         showToast(
@@ -751,6 +781,7 @@ window.changeCartQty = (id, delta) => {
     renderCardControls(id);
     renderFloatingCart();
     animateCartButton();
+    saveCart();
 };
 
 // ===== Floating Cart =====
@@ -919,7 +950,6 @@ function renderCartModal() {
 }
 
 // ===== Past Orders =====
-let pastOrdersListener = null;
 
 async function loadPastOrders() {
     if (!currentUser) {
@@ -1104,7 +1134,6 @@ window.repeatOrder = (orderId) => {
 };
 
 // ===== Order Tracking =====
-let activeOrderListener = null;
 
 // Track order by ID (for guest access)
 window.trackOrderByID = async function(orderId) {
@@ -1544,7 +1573,7 @@ async function placeOrder() {
         placeBtn.classList.remove("success");
         placeBtn.disabled = false;
 
-        cart = [];
+        clearCart();
         removeCoupon();
 
         updateCartCount();
@@ -2166,6 +2195,19 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
             <div class="space-y-2">${historyHTML}</div>
         </div>
     `;
+}
+
+// ===== Service Worker Registration =====
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+            .then(reg => {
+                console.log("Service Worker registered successfully:", reg.scope);
+            })
+            .catch(err => {
+                console.warn("Service Worker registration failed:", err);
+            });
+    });
 }
 
 $("myCouponsBtn")?.addEventListener("click", loadMyCoupons);
