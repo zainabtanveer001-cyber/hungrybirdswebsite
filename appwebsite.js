@@ -2434,6 +2434,31 @@ $("promoBannerContainer")?.addEventListener("mouseleave", () => {
     startBannerAutoRotation();
 });
 
+// Touch support for swiping banners on mobile
+let touchStartX = 0;
+let touchEndX = 0;
+
+$("promoBannerContainer")?.addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    if (bannerInterval) clearInterval(bannerInterval);
+}, { passive: true });
+
+$("promoBannerContainer")?.addEventListener("touchend", (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+    startBannerAutoRotation();
+}, { passive: true });
+
+function handleSwipe() {
+    const swipeThreshold = 50; // minimum pixels to be considered a swipe
+    if (touchEndX < touchStartX - swipeThreshold) {
+        nextBannerSlide(); // Swiped left
+    }
+    if (touchEndX > touchStartX + swipeThreshold) {
+        prevBannerSlide(); // Swiped right
+    }
+}
+
 // Load banners when page loads
 document.addEventListener("DOMContentLoaded", loadBanners);
 
