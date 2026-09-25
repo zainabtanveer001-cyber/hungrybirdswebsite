@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hungrybirds-cache-v1';
+const CACHE_NAME = 'hungrybirds-cache-v2';
 const ASSETS = [
   '/',
   '/Index.html',
