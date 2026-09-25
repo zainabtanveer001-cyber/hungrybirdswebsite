@@ -19,6 +19,12 @@ import {
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+    getStorage,
+    ref,
+    uploadBytes,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k",
@@ -33,6 +39,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Only these accounts may manage coupons; real enforcement must live in Firestore security rules
 const ADMIN_EMAILS = [
@@ -428,6 +435,94 @@ async function loadCoupons() {
     }
 }
 
+// ===== Image Compression Utility =====
+async function compressImage(file, maxWidth = 1200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let width = img.width;
+                let height = img.height;
+
+                // Scale down if too large
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Compress to JPEG with quality
+                const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+                resolve(compressedDataUrl);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+}
+
+// ===== DataURL to Blob =====
+function dataURLToBlob(dataURL) {
+    const arr = dataURL.split(",");
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
+// ===== Upload Image to Firebase Storage =====
+async function uploadImage(file, bannerId, index) {
+    const compressedDataUrl = await compressImage(file);
+    const blob = dataURLToBlob(compressedDataUrl);
+
+    const storageRef = ref(storage, `banners/${bannerId}/image_${index}_${Date.now()}.jpg`);
+    await uploadBytes(storageRef, blob);
+
+    return await getDownloadURL(storageRef);
+}
+
+// ===== Image Preview Handler =====
+$("bannerImagesField")?.addEventListener("change", (event) => {
+    const files = event.target.files;
+    const previewContainer = $("imagePreviewContainer");
+    const preview = $("imagePreview");
+
+    if (!files.length) {
+        previewContainer.classList.add("hidden");
+        return;
+    }
+
+    previewContainer.classList.remove("hidden");
+    preview.innerHTML = "";
+
+    Array.from(files).forEach((file, index) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const div = document.createElement("div");
+            div.className = "relative";
+            div.innerHTML = `
+                <img src="${e.target.result}" class="w-full h-20 object-cover rounded-lg border border-gray-200">
+                <span class="absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">${index + 1}</span>
+            `;
+            preview.appendChild(div);
+        };
+    });
+});
+
 // ===== Banner Management =====
 async function loadBanners() {
     const container = $("bannersTable");
@@ -446,13 +541,14 @@ async function loadBanners() {
 
         container.innerHTML = snapshot.docs.map(docSnap => {
             const data = docSnap.data();
+            const imageCount = data.imageUrls ? data.imageUrls.length : 0;
 
             return `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border border-gray-100 rounded-2xl p-3 gap-3">
                     <div class="flex-1">
                         <div class="font-bold text-sm">${escapeHTML(data.title)}</div>
                         <div class="text-xs text-gray-500">${escapeHTML(data.description || "No description")}</div>
-                        <div class="text-xs text-gray-400 mt-1">${data.type} · ${data.imageUrl ? "Image set" : "No image"}</div>
+                        <div class="text-xs text-gray-400 mt-1">${data.type} · ${imageCount} image${imageCount !== 1 ? 's' : ''}</div>
                     </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <button data-id="${docSnap.id}" data-active="${data.active}" class="toggle-banner text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"} flex-1 sm:flex-none">
@@ -492,24 +588,35 @@ async function loadBanners() {
 $("bannerForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const imageUrl = $("bannerImageUrlField").value.trim();
+    const files = $("bannerImagesField").files;
     const title = $("bannerTitleField").value.trim();
     const description = $("bannerDescriptionField").value.trim();
     const link = $("bannerLinkField").value.trim();
     const type = $("bannerTypeField").value;
     const active = $("bannerActiveField").checked;
+    const submitBtn = $("bannerSubmitBtn");
 
-    if (!imageUrl || !title) {
-        setFormMessage("bannerFormMessage", "Image URL and title are required.");
+    if (!files.length || !title) {
+        setFormMessage("bannerFormMessage", "At least one image and a title are required.");
         $("bannerFormMessage").classList.remove("hidden");
         return;
     }
 
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Uploading...`;
+
     try {
         const bannerId = `banner_${Date.now()}`;
 
+        // Upload all images and get their URLs
+        const imageUrls = [];
+        for (let i = 0; i < files.length; i++) {
+            const url = await uploadImage(files[i], bannerId, i);
+            imageUrls.push(url);
+        }
+
         await setDoc(doc(db, "banners", bannerId), {
-            imageUrl,
+            imageUrls,
             title,
             description,
             link,
@@ -519,15 +626,19 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
             createdAt: serverTimestamp()
         });
 
-        setFormMessage("bannerFormMessage", "Banner created successfully.", false);
+        setFormMessage("bannerFormMessage", `Banner created with ${imageUrls.length} image(s).`, false);
         $("bannerFormMessage").classList.remove("hidden");
         $("bannerForm").reset();
+        $("imagePreviewContainer").classList.add("hidden");
 
         await loadBanners();
 
     } catch (error) {
         console.error("Banner creation error:", error);
-        setFormMessage("bannerFormMessage", "Could not create banner.");
+        setFormMessage("bannerFormMessage", "Could not create banner. Please try again.");
         $("bannerFormMessage").classList.remove("hidden");
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create Banner";
     }
 });

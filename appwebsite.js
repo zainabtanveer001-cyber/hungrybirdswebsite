@@ -2210,6 +2210,233 @@ if ("serviceWorker" in navigator) {
     });
 }
 
+// ===== Banner Carousel =====
+let bannerData = [];
+let currentBannerIndex = 0;
+let currentImageIndex = 0;
+let bannerInterval = null;
+
+async function loadBanners() {
+    try {
+        const snapshot = await getDocs(
+            query(
+                collection(db, "banners"),
+                where("active", "==", true),
+                orderBy("order", "asc")
+            )
+        );
+
+        bannerData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+
+        renderBannerCarousel();
+    } catch (error) {
+        console.error("Failed to load banners:", error);
+        // Hide banner container if loading fails
+        const container = $("promoBannerContainer");
+        if (container) container.classList.add("hidden");
+    }
+}
+
+function renderBannerCarousel() {
+    const container = $("promoBannerContainer");
+    const slidesWrapper = $("bannerSlides");
+    const dotsContainer = $("bannerDots");
+
+    if (!container || !slidesWrapper || !dotsContainer) return;
+
+    if (bannerData.length === 0) {
+        container.classList.add("hidden");
+        return;
+    }
+
+    // Show the banner container
+    container.classList.remove("hidden");
+
+    // Flatten all images from all banners into individual slides
+    // Each banner's images become slides in the carousel
+    const allSlides = bannerData.flatMap(banner => {
+        const images = banner.imageUrls || (banner.imageUrl ? [banner.imageUrl] : []);
+        return images.map((imageUrl, idx) => ({
+            banner,
+            imageUrl,
+            isPrimary: idx === 0
+        }));
+    });
+
+    if (allSlides.length === 0) {
+        container.classList.add("hidden");
+        return;
+    }
+
+    // Render slides
+    slidesWrapper.innerHTML = allSlides.map((slide, index) => `
+        <div
+            class="flex-none w-full h-full relative bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600"
+            data-slide-index="${index}"
+        >
+            <div class="absolute inset-0 bg-black/10"></div>
+
+            <div class="relative z-10 h-full flex flex-col md:flex-row items-center justify-between p-4 sm:p-6 md:p-8 gap-4">
+                <!-- Content Side -->
+                <div class="flex-1 text-white text-center md:text-left">
+                    <h3 class="text-xl sm:text-2xl md:text-3xl font-black mb-2 sm:mb-3 leading-tight">
+                        ${escapeHTML(slide.banner.title)}
+                    </h3>
+                    ${slide.banner.description ? `
+                        <p class="text-sm sm:text-base md:text-lg text-white/90 mb-4 leading-relaxed max-w-md mx-auto md:mx-0">
+                            ${escapeHTML(slide.banner.description)}
+                        </p>
+                    ` : ''}
+                    <div class="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold uppercase tracking-wide">
+                        <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                        ${escapeHTML(slide.banner.type)} ${slide.banner.link ? '• Click to Learn More' : ''}
+                    </div>
+                </div>
+
+                <!-- Image Display -->
+                <div class="flex-shrink-0">
+                    <img
+                        src="${escapeHTML(slide.imageUrl)}"
+                        alt="${escapeHTML(slide.banner.title)}"
+                        class="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg ring-4 ring-white/20"
+                        loading="lazy"
+                        onerror="this.src='https://via.placeholder.com/150?text=Image+Not+Found'"
+                    />
+                    ${allSlides.length > 1 ? `
+                        <div class="mt-3 flex items-center justify-center md:justify-start gap-1">
+                            ${allSlides.map((_, i) => `
+                                <span data-slide="${i}" class="w-2 h-2 rounded-full transition-all ${i === index ? 'bg-white scale-125' : 'bg-white/30'} cursor-pointer" onclick="goToSlide(${i})"></span>
+                            `).join("")}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `).join("");
+
+    // Render navigation dots (one per slide)
+    dotsContainer.innerHTML = allSlides.map((_, index) => `
+        <button
+            class="w-2 h-2 rounded-full transition-all duration-200 ${index === currentBannerIndex ? 'bg-white scale-125' : 'bg-white/50'}"
+            onclick="goToBannerSlide(${index})"
+            aria-label="Go to slide ${index + 1}"
+        ></button>
+    `).join("");
+
+    // Hide dots if only one slide
+    if (allSlides.length <= 1) {
+        dotsContainer.style.display = 'none';
+    } else {
+        dotsContainer.style.display = 'flex';
+    }
+
+    // Position the slides
+    updateBannerSlidePosition();
+
+    // Start auto-rotation if multiple banners
+    startBannerAutoRotation();
+}
+
+function getTotalSlideCount() {
+    return bannerData.reduce((total, banner) => {
+        const images = banner.imageUrls || (banner.imageUrl ? [banner.imageUrl] : []);
+        return total + images.length;
+    }, 0);
+}
+
+function updateBannerSlidePosition() {
+    const slidesWrapper = $("bannerSlides");
+    const totalSlides = getTotalSlideCount();
+    if (!slidesWrapper || totalSlides === 0) return;
+
+    const translateX = -currentBannerIndex * 100;
+    slidesWrapper.style.transform = `translateX(${translateX}%)`;
+
+    // Update dots
+    const dots = $("bannerDots")?.querySelectorAll("button");
+    if (dots) {
+        dots.forEach((dot, index) => {
+            if (index === currentBannerIndex) {
+                dot.className = "w-2 h-2 rounded-full transition-all duration-200 bg-white scale-125";
+            } else {
+                dot.className = "w-2 h-2 rounded-full transition-all duration-200 bg-white/50";
+            }
+        });
+    }
+}
+
+function goToBannerSlide(index) {
+    const totalSlides = getTotalSlideCount();
+    if (index < 0 || index >= totalSlides) return;
+
+    currentBannerIndex = index;
+    updateBannerSlidePosition();
+
+    // Restart auto-rotation
+    startBannerAutoRotation();
+}
+
+// Alias for inline onclick handlers
+window.goToSlide = goToBannerSlide;
+window.goToBannerSlide = goToBannerSlide;
+
+function nextBannerSlide() {
+    const totalSlides = getTotalSlideCount();
+    if (totalSlides === 0) return;
+    currentBannerIndex = (currentBannerIndex + 1) % totalSlides;
+    updateBannerSlidePosition();
+}
+
+function prevBannerSlide() {
+    const totalSlides = getTotalSlideCount();
+    if (totalSlides === 0) return;
+    currentBannerIndex = currentBannerIndex === 0 ? totalSlides - 1 : currentBannerIndex - 1;
+    updateBannerSlidePosition();
+}
+
+function startBannerAutoRotation() {
+    // Clear existing interval
+    if (bannerInterval) {
+        clearInterval(bannerInterval);
+        bannerInterval = null;
+    }
+
+    // Only auto-rotate if multiple slides
+    const totalSlides = getTotalSlideCount();
+    if (totalSlides <= 1) return;
+
+    bannerInterval = setInterval(nextBannerSlide, 5000); // 5 seconds
+}
+
+// Banner navigation event listeners
+$("bannerPrevBtn")?.addEventListener("click", () => {
+    prevBannerSlide();
+    startBannerAutoRotation(); // Restart timer
+});
+
+$("bannerNextBtn")?.addEventListener("click", () => {
+    nextBannerSlide();
+    startBannerAutoRotation(); // Restart timer
+});
+
+// Pause auto-rotation on hover
+$("promoBannerContainer")?.addEventListener("mouseenter", () => {
+    if (bannerInterval) {
+        clearInterval(bannerInterval);
+        bannerInterval = null;
+    }
+});
+
+$("promoBannerContainer")?.addEventListener("mouseleave", () => {
+    startBannerAutoRotation();
+});
+
+// Load banners when page loads
+document.addEventListener("DOMContentLoaded", loadBanners);
+
 $("myCouponsBtn")?.addEventListener("click", loadMyCoupons);
 $("closeMyCouponsModal")?.addEventListener("click", () => closeModal($("myCouponsModal")));
 
