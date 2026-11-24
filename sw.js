@@ -1,52 +1,81 @@
-const CACHE_NAME = 'hungrybirds-cache-v2';
+const CACHE_NAME = 'hungrybirds-cache-v3';
 const ASSETS = [
   '/',
-  '/Index.html',
+  '/index.html',
   '/styles.css',
-  '/Appwebsite.js',
+  '/appwebsite.js',
+  '/firebase-config.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ];
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    )
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', event => {
-  // Only cache GET requests
+self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // Ignore Firestore / Firebase / Analytics requests for static cache to avoid stale DB data
-  if (event.request.url.includes('firestore') || event.request.url.includes('identitytoolkit') || event.request.url.includes('google-analytics')) return;
 
+  const url = new URL(event.request.url);
+  if (
+    url.hostname.includes('firestore') ||
+    url.hostname.includes('identitytoolkit') ||
+    url.hostname.includes('securetoken') ||
+    url.hostname.includes('google-analytics')
+  ) {
+    return;
+  }
+
+  // Same-origin static assets: network-first so updates propagate immediately, cache fallback offline
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() =>
+          caches.match(event.request).then((cached) => {
+            if (cached) return cached;
+            if (event.request.mode === 'navigate') {
+              return caches.match('/index.html');
+            }
+            return Response.error();
+          })
+        )
+    );
+    return;
+  }
+
+  // External CDN / Firebase Storage assets: cache-first with network population
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      // Return cached response if found, else fetch from network
-      return cachedResponse || fetch(event.request).then(networkResponse => {
-        // Optionally cache new dynamic assets (like images)
-        if (event.request.url.includes('firebasestorage')) {
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(event.request).then((networkResponse) => {
+        if (
+          networkResponse &&
+          networkResponse.ok &&
+          (event.request.url.includes('firebasestorage') || event.request.url.includes('cdnjs.cloudflare.com'))
+        ) {
           const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }
         return networkResponse;
       });
-    }).catch(() => {
-      // Offline fallback for navigation requests
-      if (event.request.mode === 'navigate') {
-        return caches.match('/Index.html');
-      }
     })
   );
 });
