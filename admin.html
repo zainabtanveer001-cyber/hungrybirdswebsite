@@ -6,10 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hungry Birds - Coupon Admin</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        rel="icon"
+        type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f97316'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-weight='bold' font-size='28' fill='white'%3EHB%3C/text%3E%3C/svg%3E"
+    >
+    <link rel="stylesheet" href="styles.css">
     <link
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
         rel="stylesheet"
+        integrity="sha384-3B6NwesSXE7YJlcLI9RpRqGf2p/EgVH8BgoKTaUrmKNDkHPStTQ3EyoYjCGXaOTS"
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
     >
 </head>
 
@@ -20,28 +28,49 @@
         <form id="adminLoginForm" class="bg-white rounded-3xl shadow-lg p-8 w-full max-w-sm space-y-4">
             <h1 class="text-xl font-black text-center">Admin Sign In</h1>
 
-            <input
-                type="email"
-                id="adminEmail"
-                placeholder="Email"
-                required
-                class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
-            >
+            <label class="block">
+                <span class="sr-only">Admin Email</span>
+                <input
+                    type="email"
+                    id="adminEmail"
+                    aria-label="Admin Email"
+                    autocomplete="email"
+                    placeholder="Email"
+                    required
+                    class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                >
+            </label>
 
-            <input
-                type="password"
-                id="adminPassword"
-                placeholder="Password"
-                required
-                class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
-            >
+            <label class="block">
+                <span class="sr-only">Admin Password</span>
+                <input
+                    type="password"
+                    id="adminPassword"
+                    aria-label="Admin Password"
+                    autocomplete="current-password"
+                    placeholder="Password"
+                    required
+                    class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                >
+            </label>
 
             <button
                 type="submit"
-                class="w-full bg-gray-900 text-white font-bold py-3 rounded-2xl hover:bg-orange-500 transition-colors"
+                id="adminSignInBtn"
+                class="w-full bg-gray-900 text-white font-bold py-3 rounded-2xl hover:bg-orange-500 transition-colors disabled:opacity-50"
             >
                 Sign In
             </button>
+
+            <div class="text-right">
+                <button
+                    type="button"
+                    id="adminForgotPasswordBtn"
+                    class="text-xs font-semibold text-orange-600 hover:underline"
+                >
+                    Forgot password?
+                </button>
+            </div>
 
             <p id="adminLoginError" class="text-sm text-red-500 hidden"></p>
         </form>
@@ -49,7 +78,7 @@
 
     <!-- Access denied -->
     <div id="deniedScreen" class="hidden min-h-screen flex flex-col items-center justify-center p-4 text-center gap-4">
-        <i class="fa-solid fa-lock text-4xl text-red-400"></i>
+        <i class="fa-solid fa-lock text-4xl text-red-400" aria-hidden="true"></i>
         <h1 class="text-xl font-black">Access Denied</h1>
         <p class="text-gray-500">This account is not authorized to manage coupons.</p>
         <button id="deniedSignOutBtn" class="px-5 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-orange-500">
@@ -67,7 +96,7 @@
             </div>
             <div class="flex items-center gap-2">
                 <button id="refreshAdminDataBtn" title="Refresh customer and order data" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200" aria-label="Refresh customer and order data">
-                    <i class="fa-solid fa-rotate-right"></i>
+                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                 </button>
                 <button id="adminSignOutBtn" class="text-sm bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200">
                     Sign Out
@@ -102,7 +131,9 @@
             <input
                 type="text"
                 id="couponCodeField"
+                aria-label="Coupon code"
                 placeholder="Coupon code (e.g. SAVE20)"
+                maxlength="32"
                 required
                 class="px-4 py-3 rounded-2xl border border-gray-200 uppercase outline-none focus:ring-4 focus:ring-orange-100"
             >
@@ -110,6 +141,7 @@
             <input
                 type="number"
                 id="couponDiscountField"
+                aria-label="Discount percentage"
                 placeholder="Discount %"
                 min="1"
                 max="100"
@@ -119,6 +151,7 @@
 
             <select
                 id="couponTypeField"
+                aria-label="Coupon type"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
                 <option value="promo">Promo (public)</option>
@@ -128,6 +161,7 @@
             <input
                 type="email"
                 id="couponAssignedEmailField"
+                aria-label="Assigned user email (optional)"
                 placeholder="Assigned user email (optional)"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
@@ -135,6 +169,7 @@
             <input
                 type="number"
                 id="couponMaxUsesField"
+                aria-label="Max uses (optional, promo only)"
                 placeholder="Max uses (optional, promo only)"
                 min="1"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
@@ -143,12 +178,14 @@
             <input
                 type="date"
                 id="couponExpiryField"
+                aria-label="Coupon expiry date (optional)"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
 
             <button
                 type="submit"
-                class="sm:col-span-2 bg-orange-500 text-white font-bold py-3 rounded-2xl hover:bg-orange-600 transition-colors"
+                id="couponSubmitBtn"
+                class="sm:col-span-2 bg-orange-500 text-white font-bold py-3 rounded-2xl hover:bg-orange-600 transition-colors disabled:opacity-50"
             >
                 Create Coupon
             </button>
@@ -168,16 +205,16 @@
             <h2 class="sm:col-span-2 font-bold text-lg">Create Banner</h2>
 
             <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Upload Images (Multiple allowed)</label>
+                <label for="bannerImagesField" class="block text-sm font-medium text-gray-700 mb-2">Upload Images (Max 5 images, 5 MB each)</label>
                 <input
                     type="file"
                     id="bannerImagesField"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     multiple
                     required
                     class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
                 >
-                <p class="text-xs text-gray-500 mt-1">Images will be automatically compressed for fast loading</p>
+                <p class="text-xs text-gray-500 mt-1">Images will be automatically compressed for fast loading (JPEG, PNG, WebP, GIF)</p>
             </div>
 
             <div id="imagePreviewContainer" class="sm:col-span-2 hidden">
@@ -188,7 +225,9 @@
             <input
                 type="text"
                 id="bannerTitleField"
+                aria-label="Banner title"
                 placeholder="Title"
+                maxlength="120"
                 required
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
@@ -196,19 +235,23 @@
             <input
                 type="text"
                 id="bannerDescriptionField"
+                aria-label="Banner description"
                 placeholder="Description"
+                maxlength="300"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
 
             <input
-                type="text"
+                type="url"
                 id="bannerLinkField"
-                placeholder="Link/URL (optional)"
+                aria-label="Banner link URL (optional)"
+                placeholder="Link/URL (https://... or /...)"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
 
             <select
                 id="bannerTypeField"
+                aria-label="Banner type"
                 class="px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
             >
                 <option value="deal">Deal</option>

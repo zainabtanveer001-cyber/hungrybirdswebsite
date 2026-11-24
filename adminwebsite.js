@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import {
     getAuth,
     signInWithEmailAndPassword,
+    sendPasswordResetEmail,
     onAuthStateChanged,
     signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -10,12 +11,15 @@ import {
     getFirestore,
     collection,
     getDocs,
+    getDoc,
     doc,
     setDoc,
     updateDoc,
     deleteDoc,
     query,
     where,
+    orderBy,
+    limit,
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -23,29 +27,25 @@ import {
     getStorage,
     ref,
     uploadBytes,
-    getDownloadURL
+    getDownloadURL,
+    deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k",
-    authDomain: "hungry-birds-3e16f.firebaseapp.com",
-    projectId: "hungry-birds-3e16f",
-    storageBucket: "hungry-birds-3e16f.firebasestorage.app",
-    messagingSenderId: "339589167106",
-    appId: "1:339589167106:web:4828ef951176e3e41e4f1b",
-    measurementId: "G-ZVJYRZ18H1"
-};
+import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// Only these accounts may manage coupons; real enforcement must live in Firestore security rules
+// Keep this list synchronized with isAdmin() in firestore.rules
 const ADMIN_EMAILS = [
     "owner@hungrybirds.com",
     "rehan@hungrybirds-pos.local"
 ];
+
+const MAX_BANNER_FILES = 5;
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 const $ = (id) => document.getElementById(id);
 
@@ -67,6 +67,38 @@ function formatDate(value) {
     return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleString();
 }
 
+function parseLocalEndOfDay(dateStr) {
+    if (!dateStr) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+function isValidBannerLink(url) {
+    if (!url) return true;
+    return /^https?:\/\//i.test(url) || url.startsWith("/");
+}
+
+function getFriendlyAuthError(error) {
+    const code = error?.code || "";
+    if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(code)) {
+        return "Invalid email or password.";
+    }
+    if (code === "auth/invalid-email") {
+        return "Please enter a valid email address.";
+    }
+    if (code === "auth/too-many-requests") {
+        return "Too many attempts. Please wait a moment and try again.";
+    }
+    if (code === "auth/network-request-failed") {
+        return "Network error. Check your connection and try again.";
+    }
+    return "Sign-in failed. Please try again.";
+}
+
 function showScreen(screen) {
     ["loginScreen", "deniedScreen", "adminPanel"].forEach(id => {
         $(id)?.classList.toggle("hidden", id !== screen);
@@ -83,14 +115,85 @@ function setFormMessage(id, message, isError = true) {
     el.classList.add(isError ? "text-red-500" : "text-green-600");
 }
 
+function hideFormMessage(id) {
+    const el = $(id);
+    if (el) el.classList.add("hidden");
+}
+
+// ===== New Order Notification Sound =====
+const newOrderSound = new Audio("mixkit-software-interface-start-2574.wav");
+newOrderSound.preload = "auto";
+
+let newOrderListener = null;
+const seenOrderIds = new Set();
+
+function cleanupNewOrderListener() {
+    if (newOrderListener) {
+        newOrderListener();
+        newOrderListener = null;
+    }
+    seenOrderIds.clear();
+}
+
+function clearAdminTables() {
+    ["customersTable", "ordersTable", "couponsTable", "bannersTable"].forEach(id => {
+        const el = $(id);
+        if (el) el.innerHTML = "";
+    });
+    if ($("customersSummary")) $("customersSummary").textContent = "";
+    if ($("ordersSummary")) $("ordersSummary").textContent = "";
+}
+
+function startNewOrderListener() {
+    cleanupNewOrderListener();
+
+    let initialSnapshotLoaded = false;
+    const recentOrdersQuery = query(
+        collection(db, "onlineOrders"),
+        orderBy("createdAt", "desc"),
+        limit(100)
+    );
+
+    newOrderListener = onSnapshot(
+        recentOrdersQuery,
+        (snapshot) => {
+            if (!initialSnapshotLoaded) {
+                snapshot.docs.forEach(d => seenOrderIds.add(d.id));
+                initialSnapshotLoaded = true;
+                return;
+            }
+
+            snapshot.docChanges().forEach(change => {
+                if (
+                    change.type === "added" &&
+                    !seenOrderIds.has(change.doc.id)
+                ) {
+                    seenOrderIds.add(change.doc.id);
+                    newOrderSound.currentTime = 0;
+                    newOrderSound.play().catch(() => {
+                        // Autoplay blocked until first user interaction — silently ignored
+                    });
+                }
+            });
+        },
+        (error) => {
+            console.error("New order listener error:", error);
+        }
+    );
+}
+
 // ===== Auth gating =====
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
+        cleanupNewOrderListener();
+        clearAdminTables();
         showScreen("loginScreen");
         return;
     }
 
     if (!ADMIN_EMAILS.includes(user.email)) {
+        cleanupNewOrderListener();
+        clearAdminTables();
         showScreen("deniedScreen");
         return;
     }
@@ -100,63 +203,53 @@ onAuthStateChanged(auth, async (user) => {
     startNewOrderListener();
 });
 
-// ===== New Order Notification Sound =====
-const newOrderSound = new Audio("mixkit-software-interface-start-2574.wav");
-newOrderSound.preload = "auto";
-
-let newOrderListener = null;
-const seenOrderIds = new Set();
-
-function startNewOrderListener() {
-    // Avoid duplicate listeners on re-auth
-    if (newOrderListener) {
-        newOrderListener();
-        newOrderListener = null;
-    }
-
-    // Seed seen IDs with current orders so we don't fire on page load
-    getDocs(collection(db, "onlineOrders")).then(snapshot => {
-        snapshot.docs.forEach(d => seenOrderIds.add(d.id));
-
-        // Now start listening — only orders added after this point are "new"
-        newOrderListener = onSnapshot(
-            collection(db, "onlineOrders"),
-            (snapshot) => {
-                snapshot.docChanges().forEach(change => {
-                    if (
-                        change.type === "added" &&
-                        !seenOrderIds.has(change.doc.id)
-                    ) {
-                        seenOrderIds.add(change.doc.id);
-                        newOrderSound.currentTime = 0;
-                        newOrderSound.play().catch(() => {
-                            // Autoplay blocked until first user interaction — silently ignored
-                        });
-                    }
-                });
-            }
-        );
-    });
-}
-
 $("adminLoginForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const email = $("adminEmail").value.trim();
     const password = $("adminPassword").value;
+    const signInBtn = $("adminSignInBtn");
+
+    hideFormMessage("adminLoginError");
+    if (signInBtn) {
+        signInBtn.disabled = true;
+        signInBtn.textContent = "Signing In...";
+    }
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
+        $("adminPassword").value = "";
     } catch (error) {
-        console.error("Admin sign-in error:", error);
-        setFormMessage("adminLoginError", error.message || "Sign-in failed.");
-        $("adminLoginError").classList.remove("hidden");
+        console.error("Admin sign-in error:", error?.code || error);
+        setFormMessage("adminLoginError", getFriendlyAuthError(error));
+    } finally {
+        if (signInBtn) {
+            signInBtn.disabled = false;
+            signInBtn.textContent = "Sign In";
+        }
+    }
+});
+
+$("adminForgotPasswordBtn")?.addEventListener("click", async () => {
+    const email = $("adminEmail")?.value.trim();
+    if (!email) {
+        setFormMessage("adminLoginError", "Enter your admin email first to reset your password.");
+        return;
+    }
+    try {
+        await sendPasswordResetEmail(auth, email);
+        setFormMessage("adminLoginError", "Password reset email sent if that account exists.", false);
+    } catch (error) {
+        console.error("Password reset error:", error?.code || error);
+        setFormMessage("adminLoginError", getFriendlyAuthError(error));
     }
 });
 
 $("adminSignOutBtn")?.addEventListener("click", () => signOut(auth));
 $("deniedSignOutBtn")?.addEventListener("click", () => signOut(auth));
-$("refreshAdminDataBtn")?.addEventListener("click", () => loadCustomerData());
+$("refreshAdminDataBtn")?.addEventListener("click", () =>
+    Promise.all([loadCoupons(), loadCustomerData(), loadBanners()])
+);
 
 // ===== Customer and order listing =====
 async function loadCustomerData() {
@@ -165,15 +258,15 @@ async function loadCustomerData() {
 
     if (!customersContainer || !ordersContainer) return;
 
-    const loading = `<div class="text-center text-gray-400 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    const loading = `<div class="text-center text-gray-500 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
     customersContainer.innerHTML = loading;
     ordersContainer.innerHTML = loading;
 
     try {
         const [usersSnapshot, ordersSnapshot, couponsSnapshot] = await Promise.all([
-            getDocs(collection(db, "users")),
-            getDocs(collection(db, "onlineOrders")),
-            getDocs(collection(db, "coupons"))
+            getDocs(query(collection(db, "users"), limit(200))),
+            getDocs(query(collection(db, "onlineOrders"), orderBy("createdAt", "desc"), limit(100))),
+            getDocs(query(collection(db, "coupons"), limit(200)))
         ]);
 
         const couponsByCustomer = new Map();
@@ -234,7 +327,7 @@ function renderCustomers(customers, couponsByCustomer) {
     if (summary) summary.textContent = `${sortedCustomers.length} customer${sortedCustomers.length === 1 ? "" : "s"}`;
 
     if (!sortedCustomers.length) {
-        container.innerHTML = `<p class="text-gray-400 text-sm">No customer records yet.</p>`;
+        container.innerHTML = `<p class="text-gray-500 text-sm">No customer records yet.</p>`;
         return;
     }
 
@@ -274,7 +367,7 @@ function renderOrders(orders) {
     if (summary) summary.textContent = `${orders.length} order${orders.length === 1 ? "" : "s"}`;
 
     if (!orders.length) {
-        container.innerHTML = `<p class="text-gray-400 text-sm">No online orders yet.</p>`;
+        container.innerHTML = `<p class="text-gray-500 text-sm">No online orders yet.</p>`;
         return;
     }
 
@@ -310,7 +403,7 @@ async function resolveUidByEmail(email) {
     if (!email) return null;
 
     const snapshot = await getDocs(
-        query(collection(db, "users"), where("email", "==", email))
+        query(collection(db, "users"), where("email", "==", email), limit(1))
     );
 
     return snapshot.empty ? null : snapshot.docs[0].id;
@@ -325,14 +418,38 @@ $("couponForm")?.addEventListener("submit", async (event) => {
     const assignedEmail = $("couponAssignedEmailField").value.trim();
     const maxUsesRaw = $("couponMaxUsesField").value;
     const expiryRaw = $("couponExpiryField").value;
+    const submitBtn = $("couponSubmitBtn");
 
-    if (!code || !discountPercent) {
-        setFormMessage("couponFormMessage", "Code and discount % are required.");
-        $("couponFormMessage").classList.remove("hidden");
+    if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
+        setFormMessage("couponFormMessage", "Coupon code must be 3–32 characters (letters, numbers, - or _).");
         return;
     }
 
+    if (!Number.isFinite(discountPercent) || discountPercent < 1 || discountPercent > 100) {
+        setFormMessage("couponFormMessage", "Discount % must be between 1 and 100.");
+        return;
+    }
+
+    if (type === "loyalty" && !assignedEmail) {
+        setFormMessage("couponFormMessage", "Loyalty coupons require an assigned customer email.");
+        return;
+    }
+
+    const maxUses = maxUsesRaw ? Number(maxUsesRaw) : null;
+    if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+        setFormMessage("couponFormMessage", "Max uses must be a positive whole number.");
+        return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
+        const existingCoupon = await getDoc(doc(db, "coupons", code));
+        if (existingCoupon.exists()) {
+            setFormMessage("couponFormMessage", `Coupon ${code} already exists.`);
+            return;
+        }
+
         let assignedTo = null;
 
         if (assignedEmail) {
@@ -343,7 +460,6 @@ $("couponForm")?.addEventListener("submit", async (event) => {
                     "couponFormMessage",
                     "No customer account found for that email (they must sign in at least once)."
                 );
-                $("couponFormMessage").classList.remove("hidden");
                 return;
             }
         }
@@ -357,13 +473,12 @@ $("couponForm")?.addEventListener("submit", async (event) => {
             singleUse: type === "loyalty",
             used: false,
             usedCount: 0,
-            maxUses: maxUsesRaw ? Number(maxUsesRaw) : null,
-            expiresAt: expiryRaw ? new Date(expiryRaw) : null,
+            maxUses: type === "promo" ? maxUses : null,
+            expiresAt: parseLocalEndOfDay(expiryRaw),
             createdAt: serverTimestamp()
         });
 
         setFormMessage("couponFormMessage", `Coupon ${code} created.`, false);
-        $("couponFormMessage").classList.remove("hidden");
         $("couponForm").reset();
 
         await loadCoupons();
@@ -371,7 +486,8 @@ $("couponForm")?.addEventListener("submit", async (event) => {
     } catch (error) {
         console.error("Coupon creation error:", error);
         setFormMessage("couponFormMessage", "Could not create coupon.");
-        $("couponFormMessage").classList.remove("hidden");
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
     }
 });
 
@@ -381,31 +497,35 @@ async function loadCoupons() {
 
     if (!container) return;
 
-    container.innerHTML = `<div class="text-center text-gray-400 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    container.innerHTML = `<div class="text-center text-gray-500 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
 
     try {
-        const snapshot = await getDocs(collection(db, "coupons"));
+        const snapshot = await getDocs(query(collection(db, "coupons"), limit(200)));
 
         if (snapshot.empty) {
-            container.innerHTML = `<p class="text-gray-400 text-sm">No coupons yet.</p>`;
+            container.innerHTML = `<p class="text-gray-500 text-sm">No coupons yet.</p>`;
             return;
         }
 
         container.innerHTML = snapshot.docs.map(docSnap => {
             const data = docSnap.data();
+            const safeId = escapeHTML(docSnap.id);
+            const safeCode = escapeHTML(data.code || docSnap.id);
+            const safeType = escapeHTML(data.type || "promo");
+            const safeDiscount = Number(data.discountPercent || 0);
 
             return `
                 <div class="flex justify-between items-center border border-gray-100 rounded-2xl p-3">
                     <div>
-                        <div class="font-bold">${data.code} <span class="text-xs font-normal text-gray-400">(${data.type})</span></div>
-                        <div class="text-sm text-gray-500">${data.discountPercent}% off ${data.assignedTo ? "· assigned" : "· public"}</div>
+                        <div class="font-bold">${safeCode} <span class="text-xs font-normal text-gray-500">(${safeType})</span></div>
+                        <div class="text-sm text-gray-500">${safeDiscount}% off ${data.assignedTo ? "· assigned" : "· public"}</div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button data-id="${docSnap.id}" data-active="${data.active}" class="toggle-coupon text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}">
+                        <button type="button" data-id="${safeId}" data-active="${Boolean(data.active)}" class="toggle-coupon text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}">
                             ${data.active ? "Active" : "Inactive"}
                         </button>
-                        <button data-id="${docSnap.id}" class="delete-coupon w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100">
-                            <i class="fa-solid fa-trash text-xs"></i>
+                        <button type="button" data-id="${safeId}" aria-label="Delete coupon ${safeCode}" class="delete-coupon w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100">
+                            <i class="fa-solid fa-trash text-xs" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
@@ -416,16 +536,25 @@ async function loadCoupons() {
             btn.addEventListener("click", async () => {
                 const id = btn.dataset.id;
                 const nowActive = btn.dataset.active === "true";
-
-                await updateDoc(doc(db, "coupons", id), { active: !nowActive });
-                await loadCoupons();
+                try {
+                    await updateDoc(doc(db, "coupons", id), { active: !nowActive });
+                    await loadCoupons();
+                } catch (error) {
+                    console.error("Failed to toggle coupon:", error);
+                    setFormMessage("couponFormMessage", "Could not update coupon status.");
+                }
             });
         });
 
         container.querySelectorAll(".delete-coupon").forEach(btn => {
             btn.addEventListener("click", async () => {
-                await deleteDoc(doc(db, "coupons", btn.dataset.id));
-                await loadCoupons();
+                try {
+                    await deleteDoc(doc(db, "coupons", btn.dataset.id));
+                    await loadCoupons();
+                } catch (error) {
+                    console.error("Failed to delete coupon:", error);
+                    setFormMessage("couponFormMessage", "Could not delete coupon.");
+                }
             });
         });
 
@@ -450,7 +579,7 @@ async function compressImage(file, maxWidth = 1200, quality = 0.8) {
 
                 // Scale down if too large
                 if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
+                    height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
                 }
 
@@ -458,9 +587,10 @@ async function compressImage(file, maxWidth = 1200, quality = 0.8) {
                 canvas.height = height;
 
                 const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, width, height);
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Compress to JPEG with quality
                 const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
                 resolve(compressedDataUrl);
             };
@@ -489,14 +619,14 @@ async function uploadImage(file, bannerId, index) {
     const blob = dataURLToBlob(compressedDataUrl);
 
     const storageRef = ref(storage, `banners/${bannerId}/image_${index}_${Date.now()}.jpg`);
-    await uploadBytes(storageRef, blob);
+    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
 
     return await getDownloadURL(storageRef);
 }
 
 // ===== Image Preview Handler =====
 $("bannerImagesField")?.addEventListener("change", (event) => {
-    const files = event.target.files;
+    const files = Array.from(event.target.files || []);
     const previewContainer = $("imagePreviewContainer");
     const preview = $("imagePreview");
 
@@ -505,19 +635,50 @@ $("bannerImagesField")?.addEventListener("change", (event) => {
         return;
     }
 
+    if (files.length > MAX_BANNER_FILES) {
+        setFormMessage("bannerFormMessage", `Please select at most ${MAX_BANNER_FILES} images.`);
+        event.target.value = "";
+        previewContainer.classList.add("hidden");
+        return;
+    }
+
+    for (const file of files) {
+        if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+            setFormMessage("bannerFormMessage", `Unsupported image format: ${file.name}. Use JPEG, PNG, WebP, or GIF.`);
+            event.target.value = "";
+            previewContainer.classList.add("hidden");
+            return;
+        }
+        if (file.size > MAX_BANNER_BYTES) {
+            setFormMessage("bannerFormMessage", `${file.name} exceeds the 5 MB limit.`);
+            event.target.value = "";
+            previewContainer.classList.add("hidden");
+            return;
+        }
+    }
+
+    hideFormMessage("bannerFormMessage");
     previewContainer.classList.remove("hidden");
     preview.innerHTML = "";
 
-    Array.from(files).forEach((file, index) => {
+    files.forEach((file, index) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = (e) => {
             const div = document.createElement("div");
             div.className = "relative";
-            div.innerHTML = `
-                <img src="${e.target.result}" class="w-full h-20 object-cover rounded-lg border border-gray-200">
-                <span class="absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">${index + 1}</span>
-            `;
+
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            img.alt = `Banner preview ${index + 1}`;
+            img.className = "w-full h-20 object-cover rounded-lg border border-gray-200";
+
+            const badge = document.createElement("span");
+            badge.className = "absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center";
+            badge.textContent = String(index + 1);
+
+            div.appendChild(img);
+            div.appendChild(badge);
             preview.appendChild(div);
         };
     });
@@ -529,33 +690,41 @@ async function loadBanners() {
 
     if (!container) return;
 
-    container.innerHTML = `<div class="text-center text-gray-400 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
+    container.innerHTML = `<div class="text-center text-gray-500 py-6"><i class="fa-solid fa-spinner fa-spin"></i></div>`;
 
     try {
-        const snapshot = await getDocs(collection(db, "banners"));
+        const snapshot = await getDocs(query(collection(db, "banners"), limit(50)));
 
         if (snapshot.empty) {
-            container.innerHTML = `<p class="text-gray-400 text-sm">No banners yet.</p>`;
+            container.innerHTML = `<p class="text-gray-500 text-sm">No banners yet.</p>`;
             return;
         }
 
+        const bannersById = new Map(
+            snapshot.docs.map(docSnap => [docSnap.id, docSnap.data()])
+        );
+
         container.innerHTML = snapshot.docs.map(docSnap => {
             const data = docSnap.data();
-            const imageCount = data.imageUrls ? data.imageUrls.length : 0;
+            const safeId = escapeHTML(docSnap.id);
+            const safeTitle = escapeHTML(data.title || "Banner");
+            const safeDescription = escapeHTML(data.description || "No description");
+            const safeType = escapeHTML(data.type || "promo");
+            const imageCount = Array.isArray(data.imageUrls) ? data.imageUrls.length : 0;
 
             return `
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border border-gray-100 rounded-2xl p-3 gap-3">
                     <div class="flex-1">
-                        <div class="font-bold text-sm">${escapeHTML(data.title)}</div>
-                        <div class="text-xs text-gray-500">${escapeHTML(data.description || "No description")}</div>
-                        <div class="text-xs text-gray-400 mt-1">${data.type} · ${imageCount} image${imageCount !== 1 ? 's' : ''}</div>
+                        <div class="font-bold text-sm">${safeTitle}</div>
+                        <div class="text-xs text-gray-500">${safeDescription}</div>
+                        <div class="text-xs text-gray-500 mt-1">${safeType} · ${imageCount} image${imageCount !== 1 ? 's' : ''}</div>
                     </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <button data-id="${docSnap.id}" data-active="${data.active}" class="toggle-banner text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"} flex-1 sm:flex-none">
+                        <button type="button" data-id="${safeId}" data-active="${Boolean(data.active)}" class="toggle-banner text-xs px-3 py-1.5 rounded-full ${data.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"} flex-1 sm:flex-none">
                             ${data.active ? "Active" : "Inactive"}
                         </button>
-                        <button data-id="${docSnap.id}" class="delete-banner w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100">
-                            <i class="fa-solid fa-trash text-xs"></i>
+                        <button type="button" data-id="${safeId}" aria-label="Delete banner ${safeTitle}" class="delete-banner w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100">
+                            <i class="fa-solid fa-trash text-xs" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
@@ -566,16 +735,31 @@ async function loadBanners() {
             btn.addEventListener("click", async () => {
                 const id = btn.dataset.id;
                 const nowActive = btn.dataset.active === "true";
-
-                await updateDoc(doc(db, "banners", id), { active: !nowActive });
-                await loadBanners();
+                try {
+                    await updateDoc(doc(db, "banners", id), { active: !nowActive });
+                    await loadBanners();
+                } catch (error) {
+                    console.error("Failed to toggle banner:", error);
+                    setFormMessage("bannerFormMessage", "Could not update banner status.");
+                }
             });
         });
 
         container.querySelectorAll(".delete-banner").forEach(btn => {
             btn.addEventListener("click", async () => {
-                await deleteDoc(doc(db, "banners", btn.dataset.id));
-                await loadBanners();
+                const id = btn.dataset.id;
+                const banner = bannersById.get(id);
+                const urls = Array.isArray(banner?.imageUrls) ? banner.imageUrls : [];
+                try {
+                    await Promise.allSettled(
+                        urls.map(url => deleteObject(ref(storage, url)))
+                    );
+                    await deleteDoc(doc(db, "banners", id));
+                    await loadBanners();
+                } catch (error) {
+                    console.error("Failed to delete banner:", error);
+                    setFormMessage("bannerFormMessage", "Could not delete banner.");
+                }
             });
         });
 
@@ -588,7 +772,7 @@ async function loadBanners() {
 $("bannerForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const files = $("bannerImagesField").files;
+    const files = Array.from($("bannerImagesField").files || []);
     const title = $("bannerTitleField").value.trim();
     const description = $("bannerDescriptionField").value.trim();
     const link = $("bannerLinkField").value.trim();
@@ -598,7 +782,23 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
 
     if (!files.length || !title) {
         setFormMessage("bannerFormMessage", "At least one image and a title are required.");
-        $("bannerFormMessage").classList.remove("hidden");
+        return;
+    }
+
+    if (files.length > MAX_BANNER_FILES) {
+        setFormMessage("bannerFormMessage", `You can upload up to ${MAX_BANNER_FILES} images per banner.`);
+        return;
+    }
+
+    for (const file of files) {
+        if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size > MAX_BANNER_BYTES) {
+            setFormMessage("bannerFormMessage", "Each file must be a JPEG, PNG, WebP, or GIF under 5 MB.");
+            return;
+        }
+    }
+
+    if (!isValidBannerLink(link)) {
+        setFormMessage("bannerFormMessage", "Banner link must start with https://, http://, or /.");
         return;
     }
 
@@ -608,7 +808,6 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
     try {
         const bannerId = `banner_${Date.now()}`;
 
-        // Upload all images and get their URLs
         const imageUrls = [];
         for (let i = 0; i < files.length; i++) {
             const url = await uploadImage(files[i], bannerId, i);
@@ -627,7 +826,6 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
         });
 
         setFormMessage("bannerFormMessage", `Banner created with ${imageUrls.length} image(s).`, false);
-        $("bannerFormMessage").classList.remove("hidden");
         $("bannerForm").reset();
         $("imagePreviewContainer").classList.add("hidden");
 
@@ -636,7 +834,6 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
     } catch (error) {
         console.error("Banner creation error:", error);
         setFormMessage("bannerFormMessage", "Could not create banner. Please try again.");
-        $("bannerFormMessage").classList.remove("hidden");
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Create Banner";

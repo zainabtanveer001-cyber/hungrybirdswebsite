@@ -4,6 +4,7 @@ import {
     getAuth,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
+    sendPasswordResetEmail,
     onAuthStateChanged,
     signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -24,17 +25,7 @@ import {
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-// Same Firebase project as the POS
-const firebaseConfig = {
-    apiKey: "AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k",
-    authDomain: "hungry-birds-3e16f.firebaseapp.com",
-    projectId: "hungry-birds-3e16f",
-    storageBucket: "hungry-birds-3e16f.firebasestorage.app",
-    messagingSenderId: "339589167106",
-    appId: "1:339589167106:web:4828ef951176e3e41e4f1b",
-    measurementId: "G-ZVJYRZ18H1"
-};
+import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -54,15 +45,38 @@ let activeOrderListener = null;
 let categories = [{ id: "ALL", name: "All" }];
 let menuItems = [];
 
+const modalCloseTimers = new WeakMap();
+const modalPreviousFocus = new WeakMap();
+
+const FALLBACK_SVG_IMAGE =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23fff7ed'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-size='18' font-weight='bold' fill='%23f97316'%3EHungry Birds%3C/text%3E%3C/svg%3E";
+
 // ===== Cart Persistence (localStorage) =====
 function loadCart() {
     try {
         const savedCart = localStorage.getItem("hungryBirdsCart");
-        if (savedCart) {
-            cart = JSON.parse(savedCart);
-        }
+        if (!savedCart) return;
+        const parsed = JSON.parse(savedCart);
+        if (!Array.isArray(parsed)) return;
+
+        cart = parsed
+            .filter(item =>
+                item &&
+                typeof item.id === "string" &&
+                item.id.length > 0 &&
+                Number.isFinite(Number(item.price)) &&
+                Number(item.price) >= 0 &&
+                Number.isInteger(Number(item.qty)) &&
+                Number(item.qty) > 0
+            )
+            .map(item => ({
+                ...item,
+                price: Number(item.price),
+                qty: Number(item.qty)
+            }));
     } catch (e) {
         console.warn("Failed to load cart from localStorage:", e);
+        cart = [];
     }
 }
 loadCart();
@@ -77,7 +91,11 @@ function saveCart() {
 
 function clearCart() {
     cart = [];
-    localStorage.removeItem("hungryBirdsCart");
+    try {
+        localStorage.removeItem("hungryBirdsCart");
+    } catch (e) {
+        console.warn("Failed to clear cart from localStorage:", e);
+    }
 }
 
 // ===== Small UI Helpers =====
@@ -93,13 +111,45 @@ function escapeHTML(value) {
     }[char]));
 }
 
+function getSafeUrl(url) {
+    const trimmed = String(url ?? "").trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("/")) {
+        return trimmed;
+    }
+    return "";
+}
+
+function getFriendlyAuthError(error) {
+    const code = error?.code || "";
+    if (["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found"].includes(code)) {
+        return "Invalid email or password.";
+    }
+    if (code === "auth/email-already-in-use") {
+        return "An account with this email already exists.";
+    }
+    if (code === "auth/weak-password") {
+        return "Password must be at least 6 characters.";
+    }
+    if (code === "auth/invalid-email") {
+        return "Please enter a valid email address.";
+    }
+    if (code === "auth/too-many-requests") {
+        return "Too many attempts. Please wait a moment and try again.";
+    }
+    if (code === "auth/network-request-failed") {
+        return "Network error. Please check your connection.";
+    }
+    return "Authentication failed. Please try again.";
+}
+
 function showToast(message, icon = "fa-check") {
     const toast = $("toast");
 
     if (!toast) return;
 
     $("toastMessage").textContent = message;
-    $("toastIcon").innerHTML = `<i class="fa-solid ${icon}"></i>`;
+    $("toastIcon").innerHTML = `<i class="fa-solid ${escapeHTML(icon)}"></i>`;
 
     toast.classList.add("show");
 
@@ -107,11 +157,22 @@ function showToast(message, icon = "fa-check") {
 
     toastTimer = setTimeout(() => {
         toast.classList.remove("show");
-    }, 1800);
+    }, 2200);
 }
+window.showToast = showToast;
 
 function openModal(modal) {
     if (!modal) return;
+
+    const pendingTimer = modalCloseTimers.get(modal);
+    if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        modalCloseTimers.delete(modal);
+    }
+
+    if (!modal.classList.contains("is-open") && document.activeElement instanceof HTMLElement) {
+        modalPreviousFocus.set(modal, document.activeElement);
+    }
 
     modal.classList.remove("hidden");
     modal.setAttribute("aria-hidden", "false");
@@ -119,6 +180,10 @@ function openModal(modal) {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             modal.classList.add("is-open");
+            const focusTarget = modal.querySelector(
+                'input:not([type="hidden"]):not(.hidden), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            focusTarget?.focus();
         });
     });
 
@@ -128,14 +193,29 @@ function openModal(modal) {
 function closeModal(modal) {
     if (!modal) return;
 
+    const existingTimer = modalCloseTimers.get(modal);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
+    }
+
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         modal.classList.add("hidden");
+        modalCloseTimers.delete(modal);
     }, 280);
+    modalCloseTimers.set(modal, timer);
 
-    document.body.classList.remove("overflow-hidden");
+    if (!document.querySelector(".modal-backdrop.is-open")) {
+        document.body.classList.remove("overflow-hidden");
+    }
+
+    const prevFocus = modalPreviousFocus.get(modal);
+    if (prevFocus && typeof prevFocus.focus === "function" && prevFocus.isConnected) {
+        prevFocus.focus();
+    }
+    modalPreviousFocus.delete(modal);
 }
 
 function animateCartButton() {
@@ -212,15 +292,19 @@ async function loadMenuFromFirestore() {
     ]);
 
     const dbCategories = categorySnapshot.docs
-        .map(doc => ({
-            id: doc.id,
-            name: firstDefined(doc.data(), ["name", "title", "label"])
+        .map(docSnap => ({
+            id: docSnap.id,
+            name: firstDefined(docSnap.data(), ["name", "title", "label"])
         }))
         .filter(category => category.name);
 
+    const rawDocsById = new Map(
+        menuSnapshot.docs.map(docSnap => [docSnap.id, docSnap.data()])
+    );
+
     const dbMenuItems = menuSnapshot.docs
-        .map(doc => {
-            const data = doc.data();
+        .map(docSnap => {
+            const data = docSnap.data();
             const itemName = firstDefined(
                 data,
                 ["name", "displayName", "title", "itemName"]
@@ -237,8 +321,8 @@ async function loadMenuFromFirestore() {
             );
 
             return {
-                id: doc.id,
-                menuItemId: doc.id,
+                id: docSnap.id,
+                menuItemId: docSnap.id,
                 recipeId: typeof recipeId === "object" && recipeId !== null
                     ? recipeId.id || null
                     : recipeId,
@@ -254,7 +338,7 @@ async function loadMenuFromFirestore() {
         })
         .filter(item => item.name && Number.isFinite(item.price))
         .filter(item => !hasExplicitFalse(
-            menuSnapshot.docs.find(doc => doc.id === item.id).data(),
+            rawDocsById.get(item.id),
             ["active", "isActive", "available", "isAvailable", "published", "isPublished"]
         ));
 
@@ -280,6 +364,22 @@ async function loadMenuFromFirestore() {
         ...categoryMap.values()
     ];
     menuItems = dbMenuItems;
+
+    // Reconcile persisted cart pricing/names with live menu catalog
+    if (cart.length) {
+        const menuById = new Map(menuItems.map(item => [item.id, item]));
+        cart = cart
+            .filter(cartItem => menuById.has(cartItem.id))
+            .map(cartItem => {
+                const liveItem = menuById.get(cartItem.id);
+                return {
+                    ...liveItem,
+                    menuItemId: liveItem.menuItemId,
+                    qty: cartItem.qty
+                };
+            });
+        saveCart();
+    }
 }
 
 // ===== Categories =====
@@ -294,6 +394,7 @@ function renderCategories(activeId = "ALL") {
         const btn = document.createElement("button");
         const active = cat.id === activeId;
 
+        btn.type = "button";
         btn.className = `
             category-btn
             whitespace-nowrap
@@ -368,6 +469,7 @@ function filterMenu(category, btnElement) {
 
 // ===== Menu Rendering =====
 function cardControlsHTML(id) {
+    const safeId = escapeHTML(id);
     const cartItem = cart.find(
         item => item.id === id
     );
@@ -377,7 +479,10 @@ function cardControlsHTML(id) {
             <div class="flex items-center gap-1.5 bg-gray-900 rounded-xl px-2 py-1.5 shadow-lg">
 
                 <button
-                    onclick="changeCartQty('${id}', -1)"
+                    type="button"
+                    data-action="qty"
+                    data-id="${safeId}"
+                    data-delta="-1"
                     class="w-7 h-7 rounded-lg text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
                     aria-label="Decrease quantity"
                 >
@@ -389,7 +494,10 @@ function cardControlsHTML(id) {
                 </span>
 
                 <button
-                    onclick="changeCartQty('${id}', 1)"
+                    type="button"
+                    data-action="qty"
+                    data-id="${safeId}"
+                    data-delta="1"
                     class="w-7 h-7 rounded-lg text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
                     aria-label="Increase quantity"
                 >
@@ -402,10 +510,12 @@ function cardControlsHTML(id) {
 
     return `
         <button
-            onclick="addToCart('${id}')"
+            type="button"
+            data-action="add"
+            data-id="${safeId}"
             class="bg-gray-900 text-white px-4 py-2.5 rounded-xl hover:bg-orange-500 transition-all shadow-sm hover:shadow-lg pressable"
         >
-            <i class="fa-solid fa-plus mr-1"></i>
+            <i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>
             Add
         </button>
     `;
@@ -477,10 +587,12 @@ function renderMenu(items) {
                 c => c.id === item.categoryId
             )?.name || "";
 
+        const imgSrc = item.img || FALLBACK_SVG_IMAGE;
+
         card.innerHTML = `
             <div class="relative overflow-hidden bg-gray-50">
                 <img
-                    src="${escapeHTML(item.img)}"
+                    src="${escapeHTML(imgSrc)}"
                     alt="${escapeHTML(item.name)}"
                     loading="lazy"
                     decoding="async"
@@ -500,7 +612,7 @@ function renderMenu(items) {
                     <span class="text-lg font-semibold text-gray-900 tracking-tight">
                         Rs. ${Number(item.price).toLocaleString()}
                     </span>
-                    <div id="qtyBox-${item.id}">
+                    <div id="qtyBox-${escapeHTML(item.id)}">
                         ${cardControlsHTML(item.id)}
                     </div>
                 </div>
@@ -512,8 +624,7 @@ function renderMenu(items) {
         image.addEventListener(
             "error",
             () => {
-                image.src =
-                    `https://placehold.co/800x600?text=${encodeURIComponent(item.name)}`;
+                image.src = FALLBACK_SVG_IMAGE;
             },
             { once: true }
         );
@@ -701,9 +812,8 @@ function removeCoupon() {
     renderFloatingCart();
 }
 
-
 // Add to cart
-window.addToCart = (id) => {
+function addToCart(id) {
     const item = menuItems.find(
         item => item.id === id
     );
@@ -734,10 +844,11 @@ window.addToCart = (id) => {
         `${item.name} added to cart`,
         "fa-check"
     );
-};
+}
+window.addToCart = addToCart;
 
 // Remove from cart
-window.removeFromCart = (id) => {
+function removeFromCart(id) {
     const removed = cart.find(
         item => item.id === id
     );
@@ -758,10 +869,11 @@ window.removeFromCart = (id) => {
             "fa-trash"
         );
     }
-};
+}
+window.removeFromCart = removeFromCart;
 
 // Change quantity
-window.changeCartQty = (id, delta) => {
+function changeCartQty(id, delta) {
     const item = cart.find(
         cartItem => cartItem.id === id
     );
@@ -782,7 +894,8 @@ window.changeCartQty = (id, delta) => {
     renderFloatingCart();
     animateCartButton();
     saveCart();
-};
+}
+window.changeCartQty = changeCartQty;
 
 // ===== Floating Cart =====
 function renderFloatingCart() {
@@ -809,7 +922,9 @@ function renderFloatingCart() {
         `Rs. ${getCartTotal().toLocaleString()}`;
 
     $("floatingCartItems").innerHTML =
-        cart.map(item => `
+        cart.map(item => {
+            const safeId = escapeHTML(item.id);
+            return `
             <div class="flex justify-between items-center text-sm rounded-2xl px-2 py-2 hover:bg-gray-50 transition-colors">
 
                 <div class="truncate pr-2">
@@ -827,7 +942,11 @@ function renderFloatingCart() {
                 <div class="flex items-center gap-1 shrink-0">
 
                     <button
-                        onclick="changeCartQty('${item.id}', -1)"
+                        type="button"
+                        data-action="qty"
+                        data-id="${safeId}"
+                        data-delta="-1"
+                        aria-label="Decrease quantity of ${escapeHTML(item.name)}"
                         class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-xs transition-colors pressable"
                     >
                         −
@@ -838,7 +957,11 @@ function renderFloatingCart() {
                     </span>
 
                     <button
-                        onclick="changeCartQty('${item.id}', 1)"
+                        type="button"
+                        data-action="qty"
+                        data-id="${safeId}"
+                        data-delta="1"
+                        aria-label="Increase quantity of ${escapeHTML(item.name)}"
                         class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-xs transition-colors pressable"
                     >
                         +
@@ -847,7 +970,8 @@ function renderFloatingCart() {
                 </div>
 
             </div>
-        `).join("");
+        `;
+        }).join("");
 
     pricePulse(
         $("floatingCartTotal")
@@ -865,9 +989,9 @@ function renderCartModal() {
     if (cart.length === 0) {
 
         list.innerHTML = `
-            <div class="text-center text-gray-400 py-12">
+            <div class="text-center text-gray-500 py-12">
 
-                <div class="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 grid place-items-center mx-auto mb-4">
+                <div class="w-16 h-16 rounded-2xl bg-gray-100 text-gray-500 grid place-items-center mx-auto mb-4">
                     <i class="fa-solid fa-cart-shopping text-xl"></i>
                 </div>
 
@@ -884,13 +1008,16 @@ function renderCartModal() {
 
     } else {
 
-        list.innerHTML = cart.map(item => `
+        list.innerHTML = cart.map(item => {
+            const safeId = escapeHTML(item.id);
+            const safeName = escapeHTML(item.name);
+            return `
             <div class="flex justify-between items-center border border-gray-100 rounded-2xl p-3 hover:shadow-sm transition-all">
 
                 <div class="min-w-0 pr-3">
 
                     <div class="font-bold text-gray-800 truncate">
-                        ${escapeHTML(item.name)}
+                        ${safeName}
                     </div>
 
                     <div class="text-sm text-gray-500 mt-0.5">
@@ -902,7 +1029,11 @@ function renderCartModal() {
                 <div class="flex items-center gap-1.5 shrink-0">
 
                     <button
-                        onclick="changeCartQty('${item.id}', -1)"
+                        type="button"
+                        data-action="qty"
+                        data-id="${safeId}"
+                        data-delta="-1"
+                        aria-label="Decrease quantity of ${safeName}"
                         class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold transition-colors pressable"
                     >
                         −
@@ -913,24 +1044,31 @@ function renderCartModal() {
                     </span>
 
                     <button
-                        onclick="changeCartQty('${item.id}', 1)"
+                        type="button"
+                        data-action="qty"
+                        data-id="${safeId}"
+                        data-delta="1"
+                        aria-label="Increase quantity of ${safeName}"
                         class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold transition-colors pressable"
                     >
                         +
                     </button>
 
                     <button
-                        onclick="removeFromCart('${item.id}')"
+                        type="button"
+                        data-action="remove"
+                        data-id="${safeId}"
                         class="w-8 h-8 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors pressable"
-                        aria-label="Remove item"
+                        aria-label="Remove ${safeName}"
                     >
-                        <i class="fa-solid fa-trash text-xs"></i>
+                        <i class="fa-solid fa-trash text-xs" aria-hidden="true"></i>
                     </button>
 
                 </div>
 
             </div>
-        `).join("");
+        `;
+        }).join("");
     }
 
     totalDisplay.textContent =
@@ -950,6 +1088,13 @@ function renderCartModal() {
 }
 
 // ===== Past Orders =====
+function closePastOrdersModal() {
+    if (pastOrdersListener) {
+        pastOrdersListener();
+        pastOrdersListener = null;
+    }
+    closeModal($("pastOrdersModal"));
+}
 
 async function loadPastOrders() {
     if (!currentUser) {
@@ -968,7 +1113,7 @@ async function loadPastOrders() {
     if (!list) return;
 
     list.innerHTML = `
-        <div class="text-center text-gray-400 py-12">
+        <div class="text-center text-gray-500 py-12">
             <i class="fa-solid fa-spinner fa-spin text-xl"></i>
         </div>
     `;
@@ -976,13 +1121,11 @@ async function loadPastOrders() {
     openModal($("pastOrdersModal"));
 
     try {
-        // Clean up existing listener
         if (pastOrdersListener) {
             pastOrdersListener();
             pastOrdersListener = null;
         }
 
-        // Set up real-time listener for user's orders (limit to 20 most recent)
         pastOrdersListener = onSnapshot(
             query(
                 collection(db, "onlineOrders"),
@@ -1003,11 +1146,11 @@ async function loadPastOrders() {
                 console.error("Failed to load past orders:", error);
 
                 list.innerHTML = `
-                    <div class="text-center text-gray-400 py-12">
+                    <div class="text-center text-gray-500 py-12">
                         <p class="font-semibold text-gray-600">Couldn't load your past orders.</p>
-                        <p class="text-sm mt-1">${error.code === 'permission-denied'
-                            ? 'Permission denied. Please contact support.'
-                            : 'Please try again later.'}</p>
+                        <p class="text-sm mt-1">${error.code === "permission-denied"
+                            ? "Permission denied. Please contact support."
+                            : "Please try again later."}</p>
                     </div>
                 `;
             }
@@ -1017,11 +1160,11 @@ async function loadPastOrders() {
         console.error("Failed to load past orders:", error);
 
         list.innerHTML = `
-            <div class="text-center text-gray-400 py-12">
+            <div class="text-center text-gray-500 py-12">
                 <p class="font-semibold text-gray-600">Couldn't load your past orders.</p>
-                <p class="text-sm mt-1">${error.code === 'permission-denied'
-                    ? 'Permission denied. Please contact support.'
-                    : 'Please try again later.'}</p>
+                <p class="text-sm mt-1">${error.code === "permission-denied"
+                    ? "Permission denied. Please contact support."
+                    : "Please try again later."}</p>
             </div>
         `;
     }
@@ -1034,7 +1177,7 @@ function renderPastOrders() {
 
     if (!pastOrdersCache.length) {
         list.innerHTML = `
-            <div class="text-center text-gray-400 py-12">
+            <div class="text-center text-gray-500 py-12">
                 <p class="font-semibold">No past orders yet.</p>
             </div>
         `;
@@ -1051,7 +1194,8 @@ function renderPastOrders() {
             .map(item => `${item.name} × ${item.qty}`)
             .join(", ");
 
-        const status = order.status || "PENDING";
+        const status = String(order.status || "PENDING");
+        const orderType = String(order.orderType || "DELIVERY");
         const isActive = !["COMPLETED", "REJECTED"].includes(status);
 
         return `
@@ -1059,31 +1203,33 @@ function renderPastOrders() {
                 <div class="flex justify-between items-start gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="status-badge status-${status.toLowerCase()}">
-                                <i class="fa-solid ${getStatusIcon(status)} mr-1"></i>
-                                ${getStatusLabel(status)}
+                            <span class="status-badge status-${escapeHTML(status.toLowerCase())}">
+                                <i class="fa-solid ${escapeHTML(getStatusIcon(status))} mr-1" aria-hidden="true"></i>
+                                ${escapeHTML(getStatusLabel(status, orderType))}
                             </span>
-                            ${isActive ? '<span class="text-xs text-orange-500 font-semibold animate-pulse">● Live</span>' : ''}
+                            ${isActive ? '<span class="text-xs text-orange-500 font-semibold animate-pulse">● Live</span>' : ""}
                         </div>
-                        <div class="text-xs text-gray-400 mb-1">${escapeHTML(date)}</div>
+                        <div class="text-xs text-gray-500 mb-1">${escapeHTML(date)}</div>
                         <div class="text-sm text-gray-700 mt-1">${escapeHTML(itemsSummary)}</div>
                         ${order.estimatedReadyTime && isActive ? `
                             <div class="text-xs text-blue-600 mt-2 flex items-center gap-1">
-                                <i class="fa-solid fa-clock"></i>
-                                <span>Ready by ${formatEstimatedTime(order.estimatedReadyTime)}</span>
+                                <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                                <span>Ready by ${escapeHTML(formatEstimatedTime(order.estimatedReadyTime))}</span>
                             </div>
-                        ` : ''}
+                        ` : ""}
                     </div>
                     <div class="text-right shrink-0">
                         <div class="font-black text-gray-900">Rs. ${Number(order.total || 0).toLocaleString()}</div>
                         ${!isActive ? `
                             <button
-                                onclick="repeatOrder('${order.id}')"
+                                type="button"
+                                data-action="repeat-order"
+                                data-id="${escapeHTML(order.id)}"
                                 class="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-orange-500 transition-colors pressable"
                             >
                                 Repeat Order
                             </button>
-                        ` : ''}
+                        ` : ""}
                     </div>
                 </div>
             </div>
@@ -1091,7 +1237,7 @@ function renderPastOrders() {
     }).join("");
 }
 
-window.repeatOrder = (orderId) => {
+function repeatOrder(orderId) {
     const order = pastOrdersCache.find(o => o.id === orderId);
 
     if (!order) return;
@@ -1113,6 +1259,7 @@ window.repeatOrder = (orderId) => {
             cart.push({ ...menuItem, qty: orderItem.qty });
         }
 
+        renderCardControls(menuItem.id);
         addedCount += 1;
     });
 
@@ -1125,20 +1272,23 @@ window.repeatOrder = (orderId) => {
         showToast("Items added to cart", "fa-cart-shopping");
     }
 
+    saveCart();
     updateCartCount();
     renderFloatingCart();
     renderCartModal();
 
-    closeModal($("pastOrdersModal"));
+    closePastOrdersModal();
     openModal($("cartModal"));
-};
+}
+window.repeatOrder = repeatOrder;
 
 // ===== Order Tracking =====
 
-// Track order by ID (for guest access)
-window.trackOrderByID = async function(orderId) {
-    if (!orderId || !orderId.trim()) {
-        showToast("Please enter an order ID", "fa-circle-exclamation");
+// Track order by ID (uses non-PII /orderTracking projection for guests; /onlineOrders when signed in)
+async function trackOrderByID(orderId) {
+    const trimmed = String(orderId ?? "").trim();
+    if (!trimmed || trimmed.includes("/")) {
+        showToast("Please enter a valid order ID", "fa-circle-exclamation");
         return;
     }
 
@@ -1147,7 +1297,6 @@ window.trackOrderByID = async function(orderId) {
 
     if (!trackingContent || !trackingError) return;
 
-    // Show loading state
     trackingContent.innerHTML = `
         <div class="text-center py-12">
             <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
@@ -1156,8 +1305,16 @@ window.trackOrderByID = async function(orderId) {
     `;
     trackingError.classList.add("hidden");
 
+    const preferredCollection = currentUser ? "onlineOrders" : "orderTracking";
+
     try {
-        const orderDoc = await getDoc(doc(db, "onlineOrders", orderId.trim()));
+        let collectionName = preferredCollection;
+        let orderDoc = await getDoc(doc(db, collectionName, trimmed));
+
+        if (!orderDoc.exists() && collectionName === "onlineOrders") {
+            collectionName = "orderTracking";
+            orderDoc = await getDoc(doc(db, collectionName, trimmed));
+        }
 
         if (!orderDoc.exists()) {
             trackingContent.innerHTML = "";
@@ -1167,32 +1324,47 @@ window.trackOrderByID = async function(orderId) {
         }
 
         const orderData = { id: orderDoc.id, ...orderDoc.data() };
-
-        // Set up real-time listener
-        setupOrderTrackingListener(orderId.trim(), orderData);
+        setupOrderTrackingListener(trimmed, orderData, collectionName);
 
     } catch (error) {
+        if (preferredCollection === "onlineOrders" && error.code === "permission-denied") {
+            try {
+                const fallbackDoc = await getDoc(doc(db, "orderTracking", trimmed));
+                if (fallbackDoc.exists()) {
+                    setupOrderTrackingListener(
+                        trimmed,
+                        { id: fallbackDoc.id, ...fallbackDoc.data() },
+                        "orderTracking"
+                    );
+                    return;
+                }
+                trackingContent.innerHTML = "";
+                trackingError.textContent = "Order not found. Please check your order ID.";
+                trackingError.classList.remove("hidden");
+                return;
+            } catch (fallbackErr) {
+                console.error("Error tracking fallback order:", fallbackErr);
+            }
+        }
+
         console.error("Error tracking order:", error);
         trackingContent.innerHTML = "";
         trackingError.textContent = "Could not load order. Please try again.";
         trackingError.classList.remove("hidden");
     }
-};
+}
+window.trackOrderByID = trackOrderByID;
 
-// Set up real-time Firestore listener
-function setupOrderTrackingListener(orderId, initialData) {
-    // Clean up existing listener
+function setupOrderTrackingListener(orderId, initialData, collectionName = "orderTracking") {
     if (activeOrderListener) {
         activeOrderListener();
         activeOrderListener = null;
     }
 
-    // Render initial data
     renderOrderTimeline(initialData);
 
-    // Set up real-time listener
     activeOrderListener = onSnapshot(
-        doc(db, "onlineOrders", orderId),
+        doc(db, collectionName, orderId),
         (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const orderData = { id: docSnapshot.id, ...docSnapshot.data() };
@@ -1214,65 +1386,61 @@ function renderOrderTimeline(order) {
     const currentStatus = order.status || "PENDING";
     const progress = getProgressPercentage(currentStatus, orderType);
 
-    // Define status steps based on order type.
-    // Delivery: PENDING → ACCEPTED → PREPARING → OUT_FOR_DELIVERY → COMPLETED
-    // Takeaway: PENDING → ACCEPTED → PREPARING → COMPLETED
-    // (READY step removed — POS does not write that status)
     const allSteps = {
-        'DELIVERY': [
-            { status: 'PENDING',          label: 'Order Placed',     icon: 'fa-clock' },
-            { status: 'ACCEPTED',         label: 'Order Confirmed',  icon: 'fa-check-circle' },
-            { status: 'PREPARING',        label: 'Being Prepared',   icon: 'fa-fire' },
-            { status: 'OUT_FOR_DELIVERY', label: 'Out for Delivery', icon: 'fa-motorcycle' },
-            { status: 'COMPLETED',        label: 'Delivered',        icon: 'fa-circle-check' }
+        DELIVERY: [
+            { status: "PENDING", label: "Order Placed", icon: "fa-clock" },
+            { status: "ACCEPTED", label: "Order Confirmed", icon: "fa-check-circle" },
+            { status: "PREPARING", label: "Being Prepared", icon: "fa-fire" },
+            { status: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: "fa-motorcycle" },
+            { status: "COMPLETED", label: "Delivered", icon: "fa-circle-check" }
         ],
-        'TAKEAWAY': [
-            { status: 'PENDING',   label: 'Order Placed',      icon: 'fa-clock' },
-            { status: 'ACCEPTED',  label: 'Order Confirmed',   icon: 'fa-check-circle' },
-            { status: 'PREPARING', label: 'Being Prepared',    icon: 'fa-fire' },
-            { status: 'COMPLETED', label: 'Ready for Pickup',  icon: 'fa-circle-check' }
+        TAKEAWAY: [
+            { status: "PENDING", label: "Order Placed", icon: "fa-clock" },
+            { status: "ACCEPTED", label: "Order Confirmed", icon: "fa-check-circle" },
+            { status: "PREPARING", label: "Being Prepared", icon: "fa-fire" },
+            { status: "COMPLETED", label: "Ready for Pickup", icon: "fa-circle-check" }
         ]
     };
 
-    const steps = allSteps[orderType] || allSteps['DELIVERY'];
+    const steps = allSteps[orderType] || allSteps.DELIVERY;
     const currentStepIndex = steps.findIndex(s => s.status === currentStatus);
 
-    // Handle rejected orders
-    if (currentStatus === 'REJECTED') {
+    if (currentStatus === "REJECTED") {
         trackingContent.innerHTML = `
-            <div class="text-center py-8">
+            <div class="text-center py-8 px-6">
                 <div class="w-16 h-16 rounded-full bg-red-50 text-red-500 grid place-items-center mx-auto mb-4">
                     <i class="fa-solid fa-times-circle text-2xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-gray-900 mb-2">Order Cancelled</h3>
                 <p class="text-gray-600">This order has been cancelled.</p>
-                ${order.rejectionReason ? `<p class="text-sm text-gray-500 mt-2">Reason: ${escapeHTML(order.rejectionReason)}</p>` : ''}
+                ${order.rejectionReason ? `<p class="text-sm text-gray-500 mt-2">Reason: ${escapeHTML(order.rejectionReason)}</p>` : ""}
             </div>
         `;
         return;
     }
 
-    // Build timeline HTML
     const stepsHTML = steps.map((step, index) => {
         const isCompleted = index <= currentStepIndex;
         const isCurrent = index === currentStepIndex;
-        const timestamp = order[`${step.status.toLowerCase()}At`];
+        const timestamp =
+            order[`${step.status.toLowerCase()}At`] ||
+            (step.status === "OUT_FOR_DELIVERY" ? order.outForDeliveryAt : undefined);
 
         return `
-            <div class="timeline-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}">
-                <div class="timeline-icon ${isCompleted ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}">
-                    <i class="fa-solid ${step.icon}"></i>
+            <div class="timeline-step ${isCompleted ? "completed" : ""} ${isCurrent ? "current" : ""}">
+                <div class="timeline-icon ${isCompleted ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-400"}">
+                    <i class="fa-solid ${escapeHTML(step.icon)}" aria-hidden="true"></i>
                 </div>
                 <div class="flex items-start justify-between">
                     <div>
-                        <div class="font-bold text-gray-900">${step.label}</div>
-                        ${timestamp ? `<div class="text-xs text-gray-500 mt-1">${formatEstimatedTime(timestamp)}</div>` : ''}
+                        <div class="font-bold text-gray-900">${escapeHTML(step.label)}</div>
+                        ${timestamp ? `<div class="text-xs text-gray-500 mt-1">${escapeHTML(formatEstimatedTime(timestamp))}</div>` : ""}
                     </div>
-                    ${isCurrent ? '<span class="status-pulse"></span>' : ''}
+                    ${isCurrent ? '<span class="status-pulse"></span>' : ""}
                 </div>
             </div>
         `;
-    }).join('');
+    }).join("");
 
     trackingContent.innerHTML = `
         <div class="p-6">
@@ -1291,11 +1459,11 @@ function renderOrderTimeline(order) {
             <div class="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center">
-                        <i class="fa-solid ${getStatusIcon(currentStatus)}"></i>
+                        <i class="fa-solid ${escapeHTML(getStatusIcon(currentStatus))}" aria-hidden="true"></i>
                     </div>
                     <div>
                         <div class="text-xs text-orange-600 font-semibold">Current Status</div>
-                        <div class="text-lg font-black text-gray-900">${getStatusLabel(currentStatus)}</div>
+                        <div class="text-lg font-black text-gray-900">${escapeHTML(getStatusLabel(currentStatus, orderType))}</div>
                     </div>
                 </div>
             </div>
@@ -1303,12 +1471,12 @@ function renderOrderTimeline(order) {
             ${order.estimatedReadyTime ? `
                 <div class="mb-6 p-4 rounded-2xl bg-blue-50 border border-blue-100">
                     <div class="flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-clock text-blue-600"></i>
+                        <i class="fa-solid fa-clock text-blue-600" aria-hidden="true"></i>
                         <span class="text-gray-700">Estimated ready by</span>
-                        <span class="font-bold text-blue-600">${formatEstimatedTime(order.estimatedReadyTime)}</span>
+                        <span class="font-bold text-blue-600">${escapeHTML(formatEstimatedTime(order.estimatedReadyTime))}</span>
                     </div>
                 </div>
-            ` : ''}
+            ` : ""}
 
             <!-- Timeline Steps -->
             <div class="timeline">
@@ -1321,11 +1489,11 @@ function renderOrderTimeline(order) {
                 <div class="space-y-2 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-600">Order ID</span>
-                        <span class="font-mono text-gray-900">${escapeHTML(order.id)}</span>
+                        <span class="font-mono text-gray-900">${escapeHTML(order.orderId || order.id)}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Type</span>
-                        <span class="font-semibold text-gray-900">${orderType}</span>
+                        <span class="font-semibold text-gray-900">${escapeHTML(orderType)}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Total</span>
@@ -1344,18 +1512,18 @@ function closeTrackOrderModal() {
         activeOrderListener = null;
     }
     closeModal($("trackOrderModal"));
-    $("orderIdInput").value = "";
-    $("trackingContent").innerHTML = `
-        <div class="text-center py-12 text-gray-400">
-            <i class="fa-solid fa-magnifying-glass text-3xl mb-3"></i>
-            <p class="font-semibold">Enter your order ID to track</p>
-        </div>
-    `;
-    $("trackingError").classList.add("hidden");
-    // Restore the ID input section for guests / next open
+    if ($("orderIdInput")) $("orderIdInput").value = "";
+    if ($("trackingContent")) {
+        $("trackingContent").innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+                <i class="fa-solid fa-magnifying-glass text-3xl mb-3"></i>
+                <p class="font-semibold">Enter your order ID to track</p>
+            </div>
+        `;
+    }
+    $("trackingError")?.classList.add("hidden");
     $("trackOrderIdSection")?.classList.remove("hidden");
 }
-
 window.closeTrackOrderModal = closeTrackOrderModal;
 
 // ===== Order Type =====
@@ -1406,13 +1574,7 @@ function setOrderType(type) {
 // ===== POS Order Integration =====
 const pushOrderToPOS = async (orderData) => {
     try {
-        console.log("Attempting to create order with data:", {
-            customerUid: orderData.customerUid,
-            status: "PENDING",
-            currentUser: currentUser ? currentUser.uid : "NO USER"
-        });
-
-        await addDoc(
+        const docRef = await addDoc(
             collection(db, "onlineOrders"),
             {
                 ...orderData,
@@ -1422,26 +1584,30 @@ const pushOrderToPOS = async (orderData) => {
             }
         );
 
-        console.log("Order created successfully!");
-        return true;
+        // Best-effort non-PII projection for guest tracking if Cloud Functions are not yet deployed
+        try {
+            await setDoc(doc(db, "orderTracking", docRef.id), {
+                orderId: docRef.id,
+                status: "PENDING",
+                orderType: orderData.orderType,
+                total: orderData.total,
+                createdAt: serverTimestamp()
+            });
+        } catch (trackingErr) {
+            console.warn("Order tracking projection fallback skipped:", trackingErr?.code || trackingErr);
+        }
+
+        return docRef.id;
 
     } catch (error) {
-
-        console.error(
-            "POS Integration Error:",
-            error,
-            "Error code:",
-            error.code,
-            "Error message:",
-            error.message
-        );
+        console.error("POS Integration Error:", error?.code || error);
 
         showToast(
             "Could not place order. Try again.",
             "fa-circle-exclamation"
         );
 
-        return false;
+        return null;
     }
 };
 
@@ -1477,14 +1643,17 @@ async function placeOrder() {
         $("checkoutPhone").value.trim();
 
     const address =
-        $("checkoutAddress").value.trim();
+        currentOrderType === "DELIVERY"
+            ? $("checkoutAddress").value.trim()
+            : "";
 
-    if (!phone) {
+    const digitsCount = phone.replace(/\D/g, "").length;
+    if (!phone || !/^\+?[\d\s\-()]{7,20}$/.test(phone) || digitsCount < 7) {
 
         $("checkoutPhone").focus();
 
         showToast(
-            "Please enter your phone number.",
+            "Please enter a valid phone number.",
             "fa-phone"
         );
 
@@ -1551,21 +1720,20 @@ async function placeOrder() {
             currentUser.uid
     };
 
-    const ok =
+    const createdOrderId =
         await pushOrderToPOS(orderData);
 
-    if (ok) {
+    if (createdOrderId) {
         await consumeCouponAndTrackLoyalty();
     }
 
     placeBtn.classList.remove("loading");
 
-    if (!ok) {
+    if (!createdOrderId) {
         placeBtn.disabled = false;
         return;
     }
 
-    // Let the success animation play before resetting and closing
     placeBtn.classList.add("success");
 
     setTimeout(() => {
@@ -1579,13 +1747,14 @@ async function placeOrder() {
         updateCartCount();
         renderFloatingCart();
         renderCartModal();
+        menuItems.forEach(item => renderCardControls(item.id));
 
         closeModal(
             $("cartModal")
         );
 
         showToast(
-            "Order placed successfully!",
+            `Order placed! ID: ${createdOrderId}`,
             "fa-circle-check"
         );
 
@@ -1595,7 +1764,8 @@ async function placeOrder() {
     }, 1400);
 }
 
-// Marks a used coupon consumed and issues a new loyalty coupon every 10th order
+// Marks used coupon consumed and increments customer order counter.
+// Loyalty coupon issuance is handled server-side via Cloud Functions (onOrderCreated).
 async function consumeCouponAndTrackLoyalty() {
     try {
         if (appliedCoupon) {
@@ -1620,31 +1790,12 @@ async function consumeCouponAndTrackLoyalty() {
             { merge: true }
         );
 
-        const userSnap = await getDoc(userRef);
-        const orderCount = userSnap.data()?.orderCount ?? 0;
-
-        if (orderCount > 0 && orderCount % 10 === 0) {
-            const newCode = `LOYAL${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
-            await setDoc(doc(db, "coupons", newCode), {
-                code: newCode,
-                discountPercent: 10,
-                type: "loyalty",
-                assignedTo: currentUser.uid,
-                active: true,
-                singleUse: true,
-                used: false,
-                createdAt: serverTimestamp()
-            });
-
-            showToast(
-                `You've earned a 10% off coupon: ${newCode}`,
-                "fa-gift"
-            );
-        }
-
     } catch (error) {
         console.error("Loyalty/coupon tracking error:", error);
+        showToast(
+            "Order placed, though loyalty/coupon sync had a temporary issue.",
+            "fa-circle-exclamation"
+        );
     }
 }
 
@@ -1684,6 +1835,27 @@ onAuthStateChanged(
         } else {
 
             currentUser = null;
+            pastOrdersCache = [];
+            removeCoupon();
+
+            if (pastOrdersListener) {
+                pastOrdersListener();
+                pastOrdersListener = null;
+            }
+            if (activeOrderListener) {
+                activeOrderListener();
+                activeOrderListener = null;
+            }
+
+            if ($("pastOrdersList")) $("pastOrdersList").innerHTML = "";
+            if ($("myCouponsContent")) $("myCouponsContent").innerHTML = "";
+
+            if ($("pastOrdersModal")?.classList.contains("is-open")) {
+                closePastOrdersModal();
+            }
+            if ($("myCouponsModal")?.classList.contains("is-open")) {
+                closeModal($("myCouponsModal"));
+            }
 
             loginBtn.classList.remove(
                 "hidden"
@@ -1734,18 +1906,54 @@ $("cartBtn")?.addEventListener(
     }
 );
 
-// Track Order button
+// Track Order button & modal controls
 $("trackOrderBtn")?.addEventListener(
     "click",
     () => {
         openModal($("trackOrderModal"));
 
         if (currentUser) {
-            // Auto-track the most recent active order for logged-in users
             autoTrackActiveOrder();
         }
     }
 );
+
+$("closeTrackOrderModalBtn")?.addEventListener("click", closeTrackOrderModal);
+$("trackOrderSubmitBtn")?.addEventListener("click", () => {
+    trackOrderByID($("orderIdInput")?.value);
+});
+$("orderIdInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        trackOrderByID(event.target.value);
+    }
+});
+
+// Delegated click handlers for dynamically rendered cards, carts, past orders, and coupons
+document.addEventListener("click", (event) => {
+    const actionEl = event.target.closest("[data-action]");
+    if (!actionEl) return;
+
+    const { action, id, delta, code, slide } = actionEl.dataset;
+
+    if (action === "add" && id) {
+        addToCart(id);
+    } else if (action === "qty" && id) {
+        changeCartQty(id, Number(delta));
+    } else if (action === "remove" && id) {
+        removeFromCart(id);
+    } else if (action === "repeat-order" && id) {
+        repeatOrder(id);
+    } else if (action === "copy-coupon" && code) {
+        navigator.clipboard?.writeText(code)
+            .then(() => showToast("Coupon code copied!", "fa-copy"))
+            .catch(() => showToast("Could not copy code automatically.", "fa-circle-exclamation"));
+    } else if (action === "go-slide" && slide !== undefined) {
+        goToBannerSlide(Number(slide));
+    } else if (action === "reload-page") {
+        location.reload();
+    }
+});
 
 function autoTrackActiveOrder() {
     const trackingContent = $("trackingContent");
@@ -1754,7 +1962,6 @@ function autoTrackActiveOrder() {
 
     if (!trackingContent) return;
 
-    // Show loading
     trackingContent.innerHTML = `
         <div class="text-center py-12">
             <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
@@ -1763,21 +1970,19 @@ function autoTrackActiveOrder() {
     `;
     trackingError?.classList.add("hidden");
 
-    // Hide the manual ID input — not needed for logged-in users
     if (idInputSection) idInputSection.classList.add("hidden");
 
-    // Clean up any existing listener first
     if (activeOrderListener) {
         activeOrderListener();
         activeOrderListener = null;
     }
 
-    // Use onSnapshot so we always get fresh server data and react to
-    // any status change the POS makes in real time
     activeOrderListener = onSnapshot(
         query(
             collection(db, "onlineOrders"),
-            where("customerUid", "==", currentUser.uid)
+            where("customerUid", "==", currentUser.uid),
+            orderBy("createdAt", "desc"),
+            limit(20)
         ),
         (snapshot) => {
             const allOrders = snapshot.docs
@@ -1790,8 +1995,8 @@ function autoTrackActiveOrder() {
 
             if (!activeOrder) {
                 trackingContent.innerHTML = `
-                    <div class="text-center py-12 text-gray-400">
-                        <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-400"></i>
+                    <div class="text-center py-12 text-gray-500">
+                        <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-500"></i>
                         <p class="font-semibold text-gray-600">No active orders right now.</p>
                         <p class="text-sm mt-1">Place an order and track it here in real time.</p>
                     </div>
@@ -1909,6 +2114,24 @@ $("closeAuthModal")?.addEventListener(
     }
 );
 
+// Forgot password
+$("forgotPasswordBtn")?.addEventListener("click", async () => {
+    const email = $("authEmail")?.value.trim();
+    if (!email) {
+        $("authEmail")?.focus();
+        showToast("Enter your email first to reset password.", "fa-envelope");
+        return;
+    }
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+        showToast("Password reset email sent if that account exists.", "fa-envelope");
+    } catch (error) {
+        console.error("Password reset error:", error?.code || error);
+        showToast(getFriendlyAuthError(error), "fa-circle-exclamation");
+    }
+});
+
 // Toggle login/register
 $("toggleAuthMode")?.addEventListener(
     "click",
@@ -1938,6 +2161,11 @@ $("toggleAuthMode")?.addEventListener(
             isLoginMode
                 ? "Create an account"
                 : "Sign in instead";
+
+        $("authPassword")?.setAttribute(
+            "autocomplete",
+            isLoginMode ? "current-password" : "new-password"
+        );
     }
 );
 
@@ -1953,6 +2181,11 @@ $("authForm")?.addEventListener(
 
         const password =
             $("authPassword").value;
+
+        if (!isLoginMode && password.length < 6) {
+            showToast("Password must be at least 6 characters.", "fa-circle-exclamation");
+            return;
+        }
 
         const submitBtn =
             $("authSubmitBtn");
@@ -2009,12 +2242,11 @@ $("authForm")?.addEventListener(
 
             console.error(
                 "Authentication error:",
-                error
+                error?.code || error
             );
 
             showToast(
-                error.message ||
-                "Authentication failed.",
+                getFriendlyAuthError(error),
                 "fa-circle-exclamation"
             );
 
@@ -2064,15 +2296,7 @@ $("pastOrdersBtn")?.addEventListener(
 // Close past orders
 $("closePastOrdersModal")?.addEventListener(
     "click",
-    () => {
-        if (pastOrdersListener) {
-            pastOrdersListener();
-            pastOrdersListener = null;
-        }
-        closeModal(
-            $("pastOrdersModal")
-        );
-    }
+    closePastOrdersModal
 );
 
 // ===== My Coupons =====
@@ -2085,7 +2309,7 @@ async function loadMyCoupons() {
     if (!content) return;
 
     content.innerHTML = `
-        <div class="text-center py-12 text-gray-400">
+        <div class="text-center py-12 text-gray-500">
             <i class="fa-solid fa-spinner fa-spin text-2xl mb-3"></i>
             <p>Loading your coupons…</p>
         </div>
@@ -2097,7 +2321,12 @@ async function loadMyCoupons() {
         const [userSnap, couponsSnap, ordersSnap] = await Promise.all([
             getDoc(doc(db, "users", uid)),
             getDocs(query(collection(db, "coupons"), where("assignedTo", "==", uid))),
-            getDocs(query(collection(db, "onlineOrders"), where("customerUid", "==", uid)))
+            getDocs(query(
+                collection(db, "onlineOrders"),
+                where("customerUid", "==", uid),
+                orderBy("createdAt", "desc"),
+                limit(50)
+            ))
         ]);
 
         const orderCount = userSnap.data()?.orderCount ?? 0;
@@ -2109,7 +2338,7 @@ async function loadMyCoupons() {
         renderMyCoupons(orderCount, coupons, couponOrders);
     } catch (err) {
         console.error("loadMyCoupons error:", err);
-        content.innerHTML = `<div class="text-center py-12 text-red-400"><p>Could not load coupons. Please try again.</p></div>`;
+        content.innerHTML = `<div class="text-center py-12 text-red-500"><p>Could not load coupons. Please try again.</p></div>`;
     }
 }
 
@@ -2117,8 +2346,9 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
     const content = $("myCouponsContent");
     if (!content) return;
 
-    const progress = orderCount % 10;
-    const ordersLeft = 10 - progress;
+    const cycleEarned = orderCount > 0 && orderCount % 10 === 0;
+    const progress = cycleEarned ? 10 : orderCount % 10;
+    const remainingOrders = 10 - progress;
     const pct = (progress / 10) * 100;
 
     const activeCoupons = coupons.filter(c => c.active && !c.used);
@@ -2129,7 +2359,7 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
         <div class="bg-orange-50 border border-orange-100 rounded-2xl p-5">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center shrink-0">
-                    <i class="fa-solid fa-star"></i>
+                    <i class="fa-solid fa-star" aria-hidden="true"></i>
                 </div>
                 <div>
                     <div class="font-bold text-gray-900">Loyalty Reward Progress</div>
@@ -2138,7 +2368,7 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
             </div>
             <div class="flex justify-between text-sm font-semibold text-gray-700 mb-1">
                 <span>${progress} / 10 orders</span>
-                <span>${ordersLeft === 0 ? "Coupon earned!" : ordersLeft + " more to go"}</span>
+                <span>${remainingOrders === 0 ? "Coupon earned!" : remainingOrders + " more to go"}</span>
             </div>
             <div class="h-3 bg-white rounded-full overflow-hidden border border-orange-100">
                 <div class="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500" style="width:${pct}%"></div>
@@ -2146,20 +2376,25 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
         </div>
     `;
 
-    const activeCouponsHTML = activeCoupons.length ? activeCoupons.map(c => `
+    const activeCouponsHTML = activeCoupons.length ? activeCoupons.map(c => {
+        const safeCode = escapeHTML(c.id);
+        return `
         <div class="flex items-center justify-between border border-green-100 bg-green-50 rounded-2xl px-4 py-3 gap-3">
             <div>
-                <div class="font-mono font-bold text-gray-900 text-sm">${escapeHTML(c.id)}</div>
-                <div class="text-xs text-green-700 font-semibold mt-0.5">${c.discountPercent}% off — Ready to use</div>
+                <div class="font-mono font-bold text-gray-900 text-sm">${safeCode}</div>
+                <div class="text-xs text-green-700 font-semibold mt-0.5">${Number(c.discountPercent || 0)}% off — Ready to use</div>
             </div>
             <button
-                onclick="navigator.clipboard.writeText('${escapeHTML(c.id)}').then(()=>showToast('Coupon code copied!','fa-copy'))"
+                type="button"
+                data-action="copy-coupon"
+                data-code="${safeCode}"
                 class="text-xs bg-green-600 text-white px-3 py-1.5 rounded-full hover:bg-green-700 transition-colors pressable shrink-0"
             >
-                <i class="fa-solid fa-copy mr-1"></i>Copy
+                <i class="fa-solid fa-copy mr-1" aria-hidden="true"></i>Copy
             </button>
         </div>
-    `).join("") : `<p class="text-sm text-gray-400 text-center py-3">No active coupons right now.</p>`;
+    `;
+    }).join("") : `<p class="text-sm text-gray-500 text-center py-3">No active coupons right now.</p>`;
 
     const historyHTML = usedCoupons.length ? usedCoupons.map(c => {
         const saved = couponOrders.find(o => o.couponCode === c.id);
@@ -2167,16 +2402,17 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
         <div class="flex items-center justify-between border border-gray-100 rounded-2xl px-4 py-3 gap-3">
             <div>
                 <div class="font-mono font-bold text-gray-500 text-sm line-through">${escapeHTML(c.id)}</div>
-                <div class="text-xs text-gray-400 mt-0.5">${c.discountPercent}% off${saved ? ` — saved Rs. ${Number(saved.discountAmount).toLocaleString()}` : ""}</div>
+                <div class="text-xs text-gray-500 mt-0.5">${Number(c.discountPercent || 0)}% off${saved ? ` — saved Rs. ${Number(saved.discountAmount).toLocaleString()}` : ""}</div>
             </div>
             <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-semibold">Used</span>
         </div>
-    `}).join("") : `<p class="text-sm text-gray-400 text-center py-3">No coupon history yet.</p>`;
+    `;
+    }).join("") : `<p class="text-sm text-gray-500 text-center py-3">No coupon history yet.</p>`;
 
     const totalHTML = totalSaved > 0 ? `
         <div class="flex items-center justify-between bg-gray-900 text-white rounded-2xl px-5 py-4">
             <div class="flex items-center gap-2">
-                <i class="fa-solid fa-piggy-bank text-orange-400"></i>
+                <i class="fa-solid fa-piggy-bank text-orange-400" aria-hidden="true"></i>
                 <span class="font-semibold">Total saved with coupons</span>
             </div>
             <span class="font-black text-orange-400 text-lg">Rs. ${totalSaved.toLocaleString()}</span>
@@ -2201,9 +2437,6 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
         navigator.serviceWorker.register("./sw.js")
-            .then(reg => {
-                console.log("Service Worker registered successfully:", reg.scope);
-            })
             .catch(err => {
                 console.warn("Service Worker registration failed:", err);
             });
@@ -2213,7 +2446,6 @@ if ("serviceWorker" in navigator) {
 // ===== Banner Carousel =====
 let bannerData = [];
 let currentBannerIndex = 0;
-let currentImageIndex = 0;
 let bannerInterval = null;
 
 async function loadBanners() {
@@ -2226,15 +2458,14 @@ async function loadBanners() {
             )
         );
 
-        bannerData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+        bannerData = snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
         }));
 
         renderBannerCarousel();
     } catch (error) {
         console.error("Failed to load banners:", error);
-        // Hide banner container if loading fails
         const container = $("promoBannerContainer");
         if (container) container.classList.add("hidden");
     }
@@ -2244,6 +2475,8 @@ function renderBannerCarousel() {
     const container = $("promoBannerContainer");
     const slidesWrapper = $("bannerSlides");
     const dotsContainer = $("bannerDots");
+    const prevBtn = $("bannerPrevBtn");
+    const nextBtn = $("bannerNextBtn");
 
     if (!container || !slidesWrapper || !dotsContainer) return;
 
@@ -2252,11 +2485,8 @@ function renderBannerCarousel() {
         return;
     }
 
-    // Show the banner container
     container.classList.remove("hidden");
 
-    // Flatten all images from all banners into individual slides
-    // Each banner's images become slides in the carousel
     const allSlides = bannerData.flatMap(banner => {
         const images = banner.imageUrls || (banner.imageUrl ? [banner.imageUrl] : []);
         return images.map((imageUrl, idx) => ({
@@ -2271,12 +2501,19 @@ function renderBannerCarousel() {
         return;
     }
 
-    // Render slides
-    slidesWrapper.innerHTML = allSlides.map((slide, index) => `
+    slidesWrapper.innerHTML = allSlides.map((slide, index) => {
+        const safeLink = getSafeUrl(slide.banner.link);
+        const linkOpenTag = safeLink
+            ? `<a href="${escapeHTML(safeLink)}" target="_blank" rel="noopener noreferrer" class="block h-full focus:outline-none">`
+            : "";
+        const linkCloseTag = safeLink ? `</a>` : "";
+
+        return `
         <div
             class="flex-none w-full h-full relative bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600"
             data-slide-index="${index}"
         >
+            ${linkOpenTag}
             <div class="absolute inset-0 bg-black/10"></div>
 
             <div class="relative z-10 h-full flex flex-col md:flex-row items-center justify-between p-4 sm:p-6 md:p-8 gap-4">
@@ -2289,54 +2526,50 @@ function renderBannerCarousel() {
                         <p class="text-sm sm:text-base md:text-lg text-white/90 mb-4 leading-relaxed max-w-md mx-auto md:mx-0">
                             ${escapeHTML(slide.banner.description)}
                         </p>
-                    ` : ''}
+                    ` : ""}
                     <div class="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold uppercase tracking-wide">
                         <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                        ${escapeHTML(slide.banner.type)} ${slide.banner.link ? '• Click to Learn More' : ''}
+                        ${escapeHTML(slide.banner.type)}${safeLink ? " • Click to Learn More" : ""}
                     </div>
                 </div>
 
                 <!-- Image Display -->
                 <div class="flex-shrink-0">
                     <img
-                        src="${escapeHTML(slide.imageUrl)}"
+                        src="${escapeHTML(slide.imageUrl || FALLBACK_SVG_IMAGE)}"
                         alt="${escapeHTML(slide.banner.title)}"
-                        class="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg ring-4 ring-white/20"
+                        class="banner-slide-img w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-2xl object-cover shadow-lg ring-4 ring-white/20"
                         loading="lazy"
-                        onerror="this.src='https://via.placeholder.com/150?text=Image+Not+Found'"
                     />
-                    ${allSlides.length > 1 ? `
-                        <div class="mt-3 flex items-center justify-center md:justify-start gap-1">
-                            ${allSlides.map((_, i) => `
-                                <span data-slide="${i}" class="w-2 h-2 rounded-full transition-all ${i === index ? 'bg-white scale-125' : 'bg-white/30'} cursor-pointer" onclick="goToSlide(${i})"></span>
-                            `).join("")}
-                        </div>
-                    ` : ''}
                 </div>
             </div>
+            ${linkCloseTag}
         </div>
-    `).join("");
+    `;
+    }).join("");
 
-    // Render navigation dots (one per slide)
+    slidesWrapper.querySelectorAll(".banner-slide-img").forEach(img => {
+        img.addEventListener("error", () => {
+            img.src = FALLBACK_SVG_IMAGE;
+        }, { once: true });
+    });
+
     dotsContainer.innerHTML = allSlides.map((_, index) => `
         <button
-            class="w-2 h-2 rounded-full transition-all duration-200 ${index === currentBannerIndex ? 'bg-white scale-125' : 'bg-white/50'}"
-            onclick="goToBannerSlide(${index})"
+            type="button"
+            data-action="go-slide"
+            data-slide="${index}"
+            class="w-2 h-2 rounded-full transition-all duration-200 ${index === currentBannerIndex ? "bg-white scale-125" : "bg-white/50"}"
             aria-label="Go to slide ${index + 1}"
         ></button>
     `).join("");
 
-    // Hide dots if only one slide
-    if (allSlides.length <= 1) {
-        dotsContainer.style.display = 'none';
-    } else {
-        dotsContainer.style.display = 'flex';
-    }
+    const hasMultiple = allSlides.length > 1;
+    dotsContainer.style.display = hasMultiple ? "flex" : "none";
+    prevBtn?.classList.toggle("hidden", !hasMultiple);
+    nextBtn?.classList.toggle("hidden", !hasMultiple);
 
-    // Position the slides
     updateBannerSlidePosition();
-
-    // Start auto-rotation if multiple banners
     startBannerAutoRotation();
 }
 
@@ -2355,7 +2588,6 @@ function updateBannerSlidePosition() {
     const translateX = -currentBannerIndex * 100;
     slidesWrapper.style.transform = `translateX(${translateX}%)`;
 
-    // Update dots
     const dots = $("bannerDots")?.querySelectorAll("button");
     if (dots) {
         dots.forEach((dot, index) => {
@@ -2375,11 +2607,9 @@ function goToBannerSlide(index) {
     currentBannerIndex = index;
     updateBannerSlidePosition();
 
-    // Restart auto-rotation
     startBannerAutoRotation();
 }
 
-// Alias for inline onclick handlers
 window.goToSlide = goToBannerSlide;
 window.goToBannerSlide = goToBannerSlide;
 
@@ -2398,31 +2628,27 @@ function prevBannerSlide() {
 }
 
 function startBannerAutoRotation() {
-    // Clear existing interval
     if (bannerInterval) {
         clearInterval(bannerInterval);
         bannerInterval = null;
     }
 
-    // Only auto-rotate if multiple slides
     const totalSlides = getTotalSlideCount();
     if (totalSlides <= 1) return;
 
-    bannerInterval = setInterval(nextBannerSlide, 5000); // 5 seconds
+    bannerInterval = setInterval(nextBannerSlide, 5000);
 }
 
-// Banner navigation event listeners
 $("bannerPrevBtn")?.addEventListener("click", () => {
     prevBannerSlide();
-    startBannerAutoRotation(); // Restart timer
+    startBannerAutoRotation();
 });
 
 $("bannerNextBtn")?.addEventListener("click", () => {
     nextBannerSlide();
-    startBannerAutoRotation(); // Restart timer
+    startBannerAutoRotation();
 });
 
-// Pause auto-rotation on hover
 $("promoBannerContainer")?.addEventListener("mouseenter", () => {
     if (bannerInterval) {
         clearInterval(bannerInterval);
@@ -2434,7 +2660,6 @@ $("promoBannerContainer")?.addEventListener("mouseleave", () => {
     startBannerAutoRotation();
 });
 
-// Touch support for swiping banners on mobile
 let touchStartX = 0;
 let touchEndX = 0;
 
@@ -2450,25 +2675,19 @@ $("promoBannerContainer")?.addEventListener("touchend", (e) => {
 }, { passive: true });
 
 function handleSwipe() {
-    const swipeThreshold = 50; // minimum pixels to be considered a swipe
+    const swipeThreshold = 50;
     if (touchEndX < touchStartX - swipeThreshold) {
-        nextBannerSlide(); // Swiped left
+        nextBannerSlide();
     }
     if (touchEndX > touchStartX + swipeThreshold) {
-        prevBannerSlide(); // Swiped right
+        prevBannerSlide();
     }
 }
 
-// Load banners when page loads
 document.addEventListener("DOMContentLoaded", loadBanners);
 
 $("myCouponsBtn")?.addEventListener("click", loadMyCoupons);
 $("closeMyCouponsModal")?.addEventListener("click", () => closeModal($("myCouponsModal")));
-
-// Fallback: delegation for myCouponsBtn in case it was hidden at load time
-document.addEventListener("click", (e) => {
-    if (e.target.closest("#myCouponsBtn")) loadMyCoupons();
-});
 
 // Apply coupon
 $("applyCouponBtn")?.addEventListener(
@@ -2481,7 +2700,8 @@ $("applyCouponBtn")?.addEventListener(
     $("authModal"),
     $("cartModal"),
     $("pastOrdersModal"),
-    $("myCouponsModal")
+    $("myCouponsModal"),
+    $("trackOrderModal")
 ].forEach(modal => {
 
     if (!modal) return;
@@ -2489,10 +2709,13 @@ $("applyCouponBtn")?.addEventListener(
     modal.addEventListener(
         "click",
         (event) => {
+            if (event.target !== modal) return;
 
-            if (
-                event.target === modal
-            ) {
+            if (modal === $("pastOrdersModal")) {
+                closePastOrdersModal();
+            } else if (modal === $("trackOrderModal")) {
+                closeTrackOrderModal();
+            } else {
                 closeModal(modal);
             }
         }
@@ -2508,44 +2731,24 @@ document.addEventListener(
             return;
         }
 
-        if (
-            $("authModal")?.classList.contains(
-                "is-open"
-            )
-        ) {
-            closeModal(
-                $("authModal")
-            );
+        if ($("authModal")?.classList.contains("is-open")) {
+            closeModal($("authModal"));
         }
 
-        if (
-            $("cartModal")?.classList.contains(
-                "is-open"
-            )
-        ) {
-            closeModal(
-                $("cartModal")
-            );
+        if ($("cartModal")?.classList.contains("is-open")) {
+            closeModal($("cartModal"));
         }
 
-        if (
-            $("pastOrdersModal")?.classList.contains(
-                "is-open"
-            )
-        ) {
-            closeModal(
-                $("pastOrdersModal")
-            );
+        if ($("pastOrdersModal")?.classList.contains("is-open")) {
+            closePastOrdersModal();
         }
 
-        if (
-            $("myCouponsModal")?.classList.contains(
-                "is-open"
-            )
-        ) {
-            closeModal(
-                $("myCouponsModal")
-            );
+        if ($("myCouponsModal")?.classList.contains("is-open")) {
+            closeModal($("myCouponsModal"));
+        }
+
+        if ($("trackOrderModal")?.classList.contains("is-open")) {
+            closeTrackOrderModal();
         }
     }
 );
@@ -2671,6 +2874,7 @@ window.addEventListener(
 async function initMenu() {
 
     setOrderType("DELIVERY");
+    updateCartCount();
 
     renderMenuSkeleton();
 
@@ -2678,6 +2882,7 @@ async function initMenu() {
 
         await loadMenuFromFirestore();
 
+        updateCartCount();
         renderCategories("ALL");
 
         renderMenu(menuItems);
@@ -2716,11 +2921,12 @@ async function initMenu() {
                 </h3>
 
                 <p class="text-gray-500 mt-1">
-                    ${errorMessage}
+                    ${escapeHTML(errorMessage)}
                 </p>
 
                 <button
-                    onclick="location.reload()"
+                    type="button"
+                    data-action="reload-page"
                     class="mt-5 px-5 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-orange-500 transition-colors pressable"
                 >
                     Refresh
@@ -2737,47 +2943,44 @@ async function initMenu() {
 
 // ===== Order Tracking Utilities =====
 
-// Status display labels
-function getStatusLabel(status) {
+function getStatusLabel(status, orderType = "DELIVERY") {
+    if (status === "COMPLETED" && orderType === "TAKEAWAY") {
+        return "Ready for Pickup";
+    }
     const labels = {
-        'PENDING':          'Order Placed',
-        'ACCEPTED':         'Order Confirmed',
-        'PREPARING':        'Being Prepared',
-        'OUT_FOR_DELIVERY': 'Out for Delivery',
-        'COMPLETED':        'Delivered',
-        'REJECTED':         'Cancelled'
+        PENDING: "Order Placed",
+        ACCEPTED: "Order Confirmed",
+        PREPARING: "Being Prepared",
+        OUT_FOR_DELIVERY: "Out for Delivery",
+        COMPLETED: "Delivered",
+        REJECTED: "Cancelled"
     };
     return labels[status] || status;
 }
 
-// Status icons
 function getStatusIcon(status) {
     const icons = {
-        'PENDING':          'fa-clock',
-        'ACCEPTED':         'fa-check-circle',
-        'PREPARING':        'fa-fire',
-        'OUT_FOR_DELIVERY': 'fa-motorcycle',
-        'COMPLETED':        'fa-circle-check',
-        'REJECTED':         'fa-times-circle'
+        PENDING: "fa-clock",
+        ACCEPTED: "fa-check-circle",
+        PREPARING: "fa-fire",
+        OUT_FOR_DELIVERY: "fa-motorcycle",
+        COMPLETED: "fa-circle-check",
+        REJECTED: "fa-times-circle"
     };
-    return icons[status] || 'fa-circle';
+    return icons[status] || "fa-circle";
 }
 
-// Time formatting
 function formatEstimatedTime(timestamp) {
-    if (!timestamp) return 'Calculating...';
+    if (!timestamp) return "Calculating...";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-// Calculate progress percentage
-// Delivery:  PENDING → ACCEPTED → PREPARING → OUT_FOR_DELIVERY → COMPLETED
-// Takeaway:  PENDING → ACCEPTED → PREPARING → COMPLETED
 function getProgressPercentage(currentStatus, orderType) {
-    const deliverySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED'];
-    const takeawaySteps = ['PENDING', 'ACCEPTED', 'PREPARING', 'COMPLETED'];
+    const deliverySteps = ["PENDING", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY", "COMPLETED"];
+    const takeawaySteps = ["PENDING", "ACCEPTED", "PREPARING", "COMPLETED"];
 
-    const steps = orderType === 'DELIVERY' ? deliverySteps : takeawaySteps;
+    const steps = orderType === "DELIVERY" ? deliverySteps : takeawaySteps;
     const currentIndex = steps.indexOf(currentStatus);
 
     if (currentIndex === -1) return 0;
