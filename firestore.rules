@@ -7,20 +7,43 @@ service cloud.firestore {
             return request.auth != null;
         }
 
-        // Keep this list in sync with ADMIN_EMAILS in adminwebsite.js
+        // Keep email lists synchronized with ADMIN_EMAILS in adminwebsite.js.
+        // Prefer custom claims (request.auth.token.admin == true) or verified email.
         function isAdmin() {
-            return isSignedIn() && request.auth.token.email in [
-                "owner@hungrybirds.com"
-            ];
+            return isSignedIn() && (
+                request.auth.token.get('admin', false) == true ||
+                (
+                    request.auth.token.email_verified == true &&
+                    request.auth.token.email in [
+                        "owner@hungrybirds.com"
+                    ]
+                ) ||
+                (
+                    request.auth.token.email in [
+                        "rehan@hungrybirds-pos.local"
+                    ] &&
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['owner', 'admin']
+                )
+            );
         }
 
-        // Staff accounts have a profile doc keyed by their auth uid (see app.js createEmployee).
+        // Staff accounts must be explicitly provisioned by an admin with a staff role/flag.
+        // Customer loyalty profile docs in /users/{uid} cannot grant staff privileges.
         function isStaff() {
-            return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+            return isAdmin() || (
+                isSignedIn() &&
+                exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                (
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isStaff', false) == true ||
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in [
+                        'owner', 'admin', 'manager', 'staff', 'cashier', 'employee'
+                    ]
+                )
+            );
         }
 
-        // The customer website needs to display the published POS menu.
-        // POS staff remain responsible for all writes.
+        // Public customer website menu & categories; POS staff manage writes.
         match /menu/{menuId} {
             allow read: if true;
             allow write: if isStaff();
@@ -31,15 +54,57 @@ service cloud.firestore {
             allow write: if isStaff();
         }
 
-        // Website orders require a signed-in customer; only staff can accept/reject/complete them.
-        // Customers can only read their own orders; staff can read all orders.
-        // Guest tracking: anyone can read a specific order if they have the exact document ID
+        // Promotional banners displayed publicly on the website; managed by admin only.
+        match /banners/{bannerId} {
+            allow read: if true;
+            allow write: if isAdmin();
+        }
+
+        // Customer orders contain PII and are strictly scoped to owner or staff.
+        // Guest order status tracking reads the sanitized /orderTracking/{orderId} projection.
         match /onlineOrders/{orderId} {
-            allow create: if isSignedIn() && request.resource.data.customerUid == request.auth.uid;
-            // Allow read for: own orders (authenticated), staff, OR anyone with direct document access (guest lookup)
-            allow read: if (isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff()))
-                        || true; // Allow guest lookup by order ID
+            allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff());
+
+            allow create: if isSignedIn() &&
+                request.resource.data.customerUid == request.auth.uid &&
+                request.resource.data.status == 'PENDING' &&
+                request.resource.data.source == 'website' &&
+                request.resource.data.orderType in ['DELIVERY', 'TAKEAWAY'] &&
+                request.resource.data.items is list &&
+                request.resource.data.items.size() > 0 &&
+                request.resource.data.items.size() <= 50 &&
+                request.resource.data.subtotal is number &&
+                request.resource.data.subtotal > 0 &&
+                (request.resource.data.orderType != 'DELIVERY' || request.resource.data.subtotal >= 500) &&
+                request.resource.data.discountAmount is number &&
+                request.resource.data.discountAmount >= 0 &&
+                request.resource.data.discountAmount <= request.resource.data.subtotal &&
+                request.resource.data.total == request.resource.data.subtotal - request.resource.data.discountAmount &&
+                request.resource.data.customer is map &&
+                request.resource.data.customer.phone is string &&
+                request.resource.data.customer.phone.size() >= 7 &&
+                request.resource.data.customer.phone.size() <= 20;
+
             allow update: if isStaff();
+            allow delete: if isAdmin();
+        }
+
+        // Public non-PII tracking projection (excludes name, phone, address, and customerUid).
+        // Collection listing is disabled so guests can only query a specific order ID they hold.
+        match /orderTracking/{orderId} {
+            allow get: if true;
+            allow list: if false;
+
+            allow create: if isSignedIn() &&
+                request.resource.data.keys().hasOnly(['orderId', 'status', 'orderType', 'total', 'createdAt']) &&
+                request.resource.data.orderId == orderId &&
+                request.resource.data.status == 'PENDING' &&
+                request.resource.data.orderType in ['DELIVERY', 'TAKEAWAY'] &&
+                request.resource.data.total is number &&
+                request.resource.data.total >= 0;
+
+            allow update: if isStaff();
+            allow delete: if isAdmin();
         }
 
         // POS-only collections: never touched by the customer website.
@@ -51,43 +116,66 @@ service cloud.firestore {
             allow read, write: if isStaff();
         }
 
-        // Public username -> auth email lookup used by the POS login screen before the
-        // employee is signed in. Deliberately excludes role/displayName/PII.
+        // POS username lookup by exact key only; collection listing blocked to prevent staff enumeration.
         match /usernameDirectory/{usernameLower} {
-            allow read: if true;
+            allow get: if true;
+            allow list: if false;
             allow write: if isAdmin();
         }
 
-        // Per-customer loyalty tracking (orderCount) and staff profile docs (keyed by uid).
-        // Admin can look up/manage any profile; staff-provisioning writes go through the Owner Admin panel.
+        // Customer loyalty counters and staff profile docs.
+        // Customers may only create/increment their own loyalty counter and can never set staff role/flags.
         match /users/{userId} {
             allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isStaff());
-            allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+            allow create: if isAdmin() || (
+                isSignedIn() &&
+                request.auth.uid == userId &&
+                request.resource.data.keys().hasOnly(['email', 'orderCount', 'updatedAt']) &&
+                !request.resource.data.keys().hasAny(['role', 'isStaff', 'permissions']) &&
+                request.resource.data.get('orderCount', 0) in [0, 1]
+            );
+
+            allow update: if isAdmin() || (
+                isSignedIn() &&
+                request.auth.uid == userId &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'orderCount', 'updatedAt']) &&
+                !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isStaff', 'permissions']) &&
+                request.resource.data.orderCount == resource.data.get('orderCount', 0) + 1
+            );
+
+            allow delete: if isAdmin();
         }
 
-        // Coupons: admins manage promo codes; customers can only self-issue/consume
-        // their own auto-generated 10%-off loyalty coupon under tightly scoped conditions.
+        // Coupons: only admins (and server Cloud Functions) can create/delete coupons.
+        // Customers can read assigned/public coupons by code and only perform one-way redemption updates.
         match /coupons/{couponId} {
-            allow read: if isSignedIn();
+            allow get: if isSignedIn();
+            allow list: if isAdmin() || (isSignedIn() && resource.data.assignedTo == request.auth.uid);
 
-            allow create: if isAdmin()
-                || (
-                    isSignedIn() &&
-                    request.resource.data.type == "loyalty" &&
-                    request.resource.data.assignedTo == request.auth.uid &&
-                    request.resource.data.discountPercent == 10 &&
-                    request.resource.data.singleUse == true &&
-                    request.resource.data.used == false &&
-                    request.resource.data.active == true
-                );
+            allow create: if isAdmin();
 
-            allow update: if isAdmin()
-                || (
-                    isSignedIn() &&
-                    (resource.data.assignedTo == request.auth.uid || resource.data.assignedTo == null) &&
-                    request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(["active", "used", "usedCount"])
-                );
+            allow update: if isAdmin() || (
+                isSignedIn() &&
+                resource.data.active == true &&
+                (
+                    (
+                        resource.data.singleUse == true &&
+                        resource.data.used == false &&
+                        resource.data.assignedTo == request.auth.uid &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'used']) &&
+                        request.resource.data.active == false &&
+                        request.resource.data.used == true
+                    ) ||
+                    (
+                        resource.data.singleUse == false &&
+                        resource.data.assignedTo == null &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']) &&
+                        request.resource.data.usedCount == resource.data.get('usedCount', 0) + 1 &&
+                        (resource.data.get('maxUses', null) == null || request.resource.data.usedCount <= resource.data.maxUses)
+                    )
+                )
+            );
 
             allow delete: if isAdmin();
         }
