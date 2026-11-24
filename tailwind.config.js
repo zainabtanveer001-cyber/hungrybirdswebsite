@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./index.html", "./admin.html", "./appwebsite.js", "./adminwebsite.js"],
+  content: [
+    "./index.html",
+    "./admin.html",
+    "./google-maps-embed.html",
+    "./appwebsite.js",
+    "./adminwebsite.js"
+  ],
   theme: {
     extend: {
       boxShadow: {
