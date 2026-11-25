@@ -26,6 +26,7 @@ import {
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
+import { initAiAssistant } from "./ai-assistant.js";
 
 if (typeof window !== "undefined") {
     window.__HB_APP_BOOTED__ = true;
@@ -2053,28 +2054,22 @@ $("browseMenuBtn")?.addEventListener(
     }
 );
 
-$("cartBtn")?.addEventListener(
-    "click",
-    () => {
+function openCartFlow() {
+    renderCartModal();
+    openModal($("cartModal"));
+}
 
-        renderCartModal();
-        openModal(
-            $("cartModal")
-        );
+function openTrackOrderFlow() {
+    openModal($("trackOrderModal"));
+    if (currentUser) {
+        autoTrackActiveOrder();
     }
-);
+}
+
+$("cartBtn")?.addEventListener("click", openCartFlow);
 
 // Track Order button & modal controls
-$("trackOrderBtn")?.addEventListener(
-    "click",
-    () => {
-        openModal($("trackOrderModal"));
-
-        if (currentUser) {
-            autoTrackActiveOrder();
-        }
-    }
-);
+$("trackOrderBtn")?.addEventListener("click", openTrackOrderFlow);
 
 $("closeTrackOrderModalBtn")?.addEventListener("click", closeTrackOrderModal);
 $("trackOrderSubmitBtn")?.addEventListener("click", () => {
@@ -3162,5 +3157,16 @@ function getProgressPercentage(currentStatus, orderType) {
     return ((currentIndex + 1) / steps.length) * 100;
 }
 
-// Start website
+// Start AI assistant & website menu
+initAiAssistant({
+    getMenuItems: () => menuItems,
+    getCategories: () => categories,
+    getCart: () => cart,
+    getOrderType: () => currentOrderType,
+    addToCart,
+    openTrackOrder: openTrackOrderFlow,
+    openCart: openCartFlow,
+    showToast
+});
+
 initMenu();

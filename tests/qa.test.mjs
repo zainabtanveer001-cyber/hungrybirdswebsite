@@ -922,3 +922,42 @@ test('US-AI-2 / US-AI-6 / US-AI-7 | TC-047: Client AI sanitizer drops all PII/im
   assert.deepEqual(Array.from(tinyBudget.recommendedItemIds), ['m3']);
   assert.equal(tinyBudget.reply.includes('150'), true);
 });
+
+test('US-AI-1 | TC-048: AI chat launcher sits bottom-left clear of right CTA/cart and drawer meets WCAG dialog ARIA + starter chips', () => {
+  const aiJs = readRepoFile('ai-assistant.js');
+
+  const fabTag = indexHtml.match(/<button[\s\S]*?id="aiChatFab"[\s\S]*?>/)?.[0] || '';
+  assert.ok(fabTag, 'Missing #aiChatFab in index.html');
+  assert.equal(fabTag.includes('bottom-20'), true);
+  assert.equal(fabTag.includes('left-3'), true);
+  assert.equal(fabTag.includes('md:bottom-6'), true);
+  assert.equal(fabTag.includes('md:left-6'), true);
+  assert.equal(fabTag.includes('aria-controls="aiChatDrawer"'), true);
+  assert.equal(fabTag.includes('aria-haspopup="dialog"'), true);
+
+  const drawerTag = indexHtml.match(/<div\s+id="aiChatDrawer"[\s\S]*?>/)?.[0] || '';
+  assert.ok(drawerTag, 'Missing #aiChatDrawer in index.html');
+  assert.equal(drawerTag.includes('hidden'), true);
+  assert.equal(drawerTag.includes('role="dialog"'), true);
+  assert.equal(drawerTag.includes('aria-modal="true"'), true);
+  assert.equal(drawerTag.includes('aria-labelledby="aiChatTitle"'), true);
+  assert.equal(drawerTag.includes('z-[60]'), true);
+
+  const chipPrompts = [...indexHtml.matchAll(/data-ai-prompt="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(chipPrompts.length, 4, 'Expected 4 starter prompt chips');
+
+  assert.equal(/id="aiChatInput"[\s\S]{0,120}maxlength="500"/.test(indexHtml), true);
+  assert.equal(aiJs.includes('onclick='), false, 'ai-assistant.js must use data-* delegation instead of inline onclick');
+  assert.equal(aiJs.includes('escapeAiHtml('), true);
+});
+
+test('US-AI-3 / US-AI-5 | TC-049: appwebsite.js wires initAiAssistant cleanly with live getters/actions and zero secrets anywhere', () => {
+  assert.equal(/import\s*\{\s*initAiAssistant\s*\}\s*from\s*["']\.\/ai-assistant\.js["']/.test(appJs), true);
+  assert.equal(/initAiAssistant\s*\(\s*\{[\s\S]*getMenuItems[\s\S]*addToCart[\s\S]*openTrackOrder:\s*openTrackOrderFlow/.test(appJs), true);
+
+  const aiJs = readRepoFile('ai-assistant.js');
+  for (const fileText of [appJs, aiJs, indexHtml]) {
+    assert.equal(fileText.includes('GEMINI_API_KEY'), false, 'Client code must never reference GEMINI_API_KEY');
+    assert.equal(/AIza[0-9A-Za-z\-_]{30,}/.test(fileText), false, 'No API key literal allowed in client/static files except firebase-config');
+  }
+});

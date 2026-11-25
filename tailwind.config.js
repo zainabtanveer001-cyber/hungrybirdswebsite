@@ -5,7 +5,8 @@ module.exports = {
     "./admin.html",
     "./google-maps-embed.html",
     "./appwebsite.js",
-    "./adminwebsite.js"
+    "./adminwebsite.js",
+    "./ai-assistant.js"
   ],
   theme: {
     extend: {
