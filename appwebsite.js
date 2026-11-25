@@ -199,10 +199,21 @@ function openModal(modal) {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             modal.classList.add("is-open");
-            const focusTarget = modal.querySelector(
-                'input:not([type="hidden"]):not(.hidden), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            const visibleInput = Array.from(
+                modal.querySelectorAll('input:not([type="hidden"])')
+            ).find(el => !el.disabled && !el.closest(".hidden"));
+            const fallbackControl = Array.from(
+                modal.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+            ).find(el =>
+                !el.closest(".hidden") &&
+                !/close/i.test(el.id || "") &&
+                !/^close\b/i.test(el.getAttribute("aria-label") || "")
             );
-            focusTarget?.focus();
+            const focusTarget = visibleInput || fallbackControl || modal;
+            if (focusTarget === modal && !modal.hasAttribute("tabindex")) {
+                modal.setAttribute("tabindex", "-1");
+            }
+            focusTarget?.focus?.();
         });
     });
 
@@ -1235,7 +1246,7 @@ function closePastOrdersModal() {
     closeModal($("pastOrdersModal"));
 }
 
-async function getOrderTimestampMs(timestamp) {
+function getOrderTimestampMs(timestamp) {
     if (!timestamp) return 0;
     if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
     if (typeof timestamp.seconds === "number") return timestamp.seconds * 1000;
@@ -2158,9 +2169,15 @@ function autoTrackActiveOrder() {
         (error) => {
             console.error("Auto-track error:", error);
             idInputSection?.classList.remove("hidden");
-            trackingContent.innerHTML = "";
+            trackingContent.innerHTML = `
+                <div class="text-center py-10 px-6 text-gray-500">
+                    <i class="fa-solid fa-magnifying-glass text-3xl mb-3 text-gray-400"></i>
+                    <p class="font-semibold text-gray-700">Could not load active orders automatically.</p>
+                    <p class="text-sm mt-1">You can enter your Order ID above to track it.</p>
+                </div>
+            `;
             if (trackingError) {
-                trackingError.textContent = "Could not load your order. Please try again.";
+                trackingError.textContent = "Could not load your active order automatically. Please track by Order ID above.";
                 trackingError.classList.remove("hidden");
             }
         }

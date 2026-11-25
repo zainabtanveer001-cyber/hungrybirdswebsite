@@ -29,7 +29,7 @@ const functionsJs = readRepoFile('functions/index.js');
  * Extracts a top-level function declaration from source text by brace matching.
  */
 function extractFunctionSource(source, fnName) {
-  const signatureRe = new RegExp(`function\\s+${fnName}\\s*\\(`);
+  const signatureRe = new RegExp(`(?:async\\s+)?function\\s+${fnName}\\s*\\(`);
   const match = signatureRe.exec(source);
   assert.ok(match, `Could not find function ${fnName}`);
   const startIdx = match.index;
@@ -561,9 +561,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v5 caches before module boot, sw.js v5 skips cross-origin requests, and vercel.json sets no-cache on SW scripts', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v6 caches before module boot, sw.js v6 skips cross-origin requests and bypasses HTTP cache, and vercel.json uses literal no-cache routes', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v5'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v6'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -572,15 +572,21 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v5 caches before module boo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v5'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v6'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
+  assert.equal(swJs.includes("cache: 'no-cache'"), true);
 
-  const swHeaderRule = (vercelJson.headers || []).find((h) => h.source === '/(sw|sw-register)\\.js');
-  assert.ok(swHeaderRule, 'Missing no-cache header rule for /sw.js and /sw-register.js in vercel.json');
-  assert.equal(
-    swHeaderRule.headers.some((h) => h.key === 'Cache-Control' && h.value.includes('no-cache')),
-    true
-  );
+  const headerSources = (vercelJson.headers || []).map((h) => h.source);
+  assert.equal(headerSources.some((s) => s.includes('(sw|sw-register)')), false, 'vercel.json should use literal SW route paths rather than regex alternation');
+  for (const literalPath of ['/sw.js', '/sw-register.js', '/appwebsite.js', '/adminwebsite.js', '/index.html', '/']) {
+    const rule = (vercelJson.headers || []).find((h) => h.source === literalPath);
+    assert.ok(rule, `Missing explicit Cache-Control header rule for ${literalPath} in vercel.json`);
+    assert.equal(
+      rule.headers.some((h) => h.key === 'Cache-Control' && h.value.includes('no-cache')),
+      true,
+      `Missing no-cache Cache-Control value on ${literalPath}`
+    );
+  }
 });
 
 test('US-1 / US-8 | TC-042: Firestore uses auto-detected long-polling + IndexedDB cache and falls back to HTTPS REST on cold-cache WatchStream timeouts', () => {
@@ -616,12 +622,14 @@ test('US-1 / US-8 | TC-042: Firestore uses auto-detected long-polling + IndexedD
   assert.equal(parsed.data.recipeRef.id, 'rec_42');
 });
 
-test('US-5 | TC-043: Customer website Firestore queries avoid undeployed composite indexes and sort order timestamps client-side', () => {
+test('US-5 | TC-043: Customer website Firestore queries avoid undeployed composite indexes and sort order timestamps synchronously client-side', () => {
   assert.equal(appJs.includes('orderBy('), false, 'appwebsite.js should sort customer query results client-side without orderBy()');
+  assert.equal(/async\s+function\s+getOrderTimestampMs/.test(appJs), false, 'getOrderTimestampMs must be synchronous so numeric subtraction in Array.sort works');
   const customerUidFilterMatches = appJs.match(/collection\(db,\s*["']onlineOrders["']\),\s*where\(["']customerUid["'],\s*["']==["'],\s*(?:currentUser\.)?uid\)/g) || [];
   assert.equal(customerUidFilterMatches.length, 3, 'Expected all 3 customer onlineOrders queries (past orders, auto-track, coupons) to filter by customerUid without orderBy/limit');
 
   const { getOrderTimestampMs } = loadAppLogic();
+  assert.equal(typeof getOrderTimestampMs({ seconds: 1700000000 }), 'number');
   assert.equal(getOrderTimestampMs({ toMillis: () => 1700000000000 }), 1700000000000);
   assert.equal(getOrderTimestampMs({ seconds: 1700000000 }), 1700000000000);
   assert.equal(getOrderTimestampMs('2026-11-25T10:00:00.000Z'), Date.parse('2026-11-25T10:00:00.000Z'));

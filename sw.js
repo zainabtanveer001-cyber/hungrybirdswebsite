@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hungrybirds-cache-v5';
+const CACHE_NAME = 'hungrybirds-cache-v6';
 const ASSETS = [
   '/',
   '/index.html',
@@ -38,9 +38,9 @@ self.addEventListener('fetch', (event) => {
   // Never cache or intercept Service Worker bootstrap scripts
   if (url.pathname === '/sw.js' || url.pathname === '/sw-register.js') return;
 
-  // Same-origin static assets: network-first so updates propagate immediately, cache fallback offline
+  // Same-origin static assets: bypass HTTP disk cache so deployments propagate immediately, cache fallback offline
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((networkResponse) => {
         if (networkResponse && networkResponse.ok) {
           const clone = networkResponse.clone();
