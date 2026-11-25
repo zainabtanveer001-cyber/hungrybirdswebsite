@@ -18,10 +18,10 @@
 - **Docs Updated:** [docs/qa/BUGS.md](./qa/BUGS.md), [docs/qa/TEST_PLAN.md](./qa/TEST_PLAN.md), [docs/audit/AUDIT_REPORT.md](./audit/AUDIT_REPORT.md), [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md).
 
 ## Next (External Deployment Actions Required)
-1. Confirm POS staff `/users/{uid}` docs in `hungry-birds-3e16f` have `role` / `isStaff` set (see [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md)).
-2. Deploy `firestore.rules`, `firestore.indexes.json`, `storage.rules`, and `functions/` to Firebase project `hungry-birds-3e16f`.
+1. Deploy unified `firestore.rules`, `firestore.indexes.json`, and `storage.rules` (and `functions/` if on Blaze plan) to Firebase project `hungry-birds-3e16f` (`firestore.rules` now preserves all 16 POS collections and uppercase `OWNER`/`MANAGER`/`CASHIER`/`WAITER` RBAC from `hungrybirdspos`).
+2. Sync the updated `firestore.rules` back to the `hungrybirdspos` repository so both repos stay identical.
 3. Deploy static site to Vercel and complete Google Cloud Console hardening (API key HTTP referrers, Firebase App Check).
-4. Smoke-test live authenticated checkout, banner carousel, and guest order tracking against deployed Firebase rules.
+4. Smoke-test live authenticated checkout, banner carousel, guest order tracking, and POS login/sync against deployed Firebase rules.
 
 ## Known Gaps / External Scope
 - **Cloud Deployment Pending:** Updated `firestore.rules`, `storage.rules`, `firestore.indexes.json`, and `functions/` are committed locally but **not yet deployed** to live Firebase project `hungry-birds-3e16f` (until deployed, live `banners` and guest order tracking queries on `hungry-birds-3e16f` still return `permission-denied`).

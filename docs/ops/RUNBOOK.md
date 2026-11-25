@@ -24,12 +24,13 @@ npm audit
 
 ---
 
-## 2. Pre-Deployment Checklist (CRITICAL — Read Before Deploying Rules!)
+## 2. Pre-Deployment Checklist (CRITICAL — POS Compatibility Verified)
 
-1. **Provision POS Staff & Admin Records First:**
-   - Because `firestore.rules` now checks `isStaff == true` or `role in ['owner', 'admin', 'manager', 'staff', 'cashier', 'employee']` on `/users/{uid}` (plus `email_verified` / `role in ['owner', 'admin']` for `isAdmin()`), ensure every genuine POS employee and admin document in Firestore `/users/{uid}` has its `role` (or `isStaff: true`) field set **before** deploying `firestore.rules`.
-   - Ensure `"owner@hungrybirds.com"` has `email_verified == true` in Firebase Auth (or set Auth Custom Claim `{ admin: true }`).
-   - Ensure `"rehan@hungrybirds-pos.local"` has a `/users/{uid}` doc with `role: "admin"` or `"owner"`.
+1. **Unified POS + Website Rules (`firestore.rules`):**
+   - [firestore.rules](../../firestore.rules) has been merged directly with `hungrybirdspos` (`C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\firestore.rules`): all **16 POS-only collections** (`suppliers`, `stockIn`, `supplierPayments`, `supplierLedger`, `expenses`, `deliveries`, `staff`, `attendance`, `leaves`, `salaryPayments`, `advancePayments`, `auditLogs`, `heldOrders`, `tableOrders` including `setting_ownerPinHash`, `recipes`, `customers`) and uppercase POS roles (`OWNER`, `MANAGER`, `CASHIER`, `WAITER`, `isStaffActive`, `isManagerOrOwner`, `isCashierOrAbove`) are preserved.
+   - POS login `usernameDirectory/{username}` uses `.doc(username).get()` and REST `GET`, which works with `allow get: if true; allow list: if false;`.
+   - POS does not upload to Firebase Storage; `storage.rules` covers `/banners/{bannerId}/{fileName}` only.
+   - Ensure `"rehan@hungrybirds-pos.local"` (if used in `admin.html`) has an active `/users/{uid}` doc with `role: "OWNER"` (or `"admin"`).
 
 2. **Install Cloud Functions Dependencies:**
    ```powershell

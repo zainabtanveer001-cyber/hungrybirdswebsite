@@ -260,25 +260,27 @@ test('US-8 | TC-030 [BUG-008]: Every local asset in sw.js ASSETS and offline fal
 // 4. Firestore & Storage Security Rules Contracts (US-7)
 // =====================================================================
 
-test('US-7 | TC-022 [BUG-001 / AUD-001]: isStaff() requires explicit staff role/flag and /users/{userId} blocks self-escalation', () => {
+test('US-7 | TC-022 [BUG-001 / AUD-001]: isStaff() requires active explicit POS role/flag and /users/{userId} blocks self-escalation', () => {
   assert.equal(
-    /function\s+isStaff\(\)\s*\{[\s\S]*?get\([\s\S]*?\/users\/\$\(request\.auth\.uid\)\)\.data\.get\('isStaff'/.test(rulesText),
-    true,
-    'isStaff() must verify explicit isStaff or role field'
-  );
-  assert.equal(
-    /match\s+\/users\/\{userId\}[\s\S]*?!request\.resource\.data\.keys\(\)\.hasAny\(\['role',\s*'isStaff',\s*'permissions'\]\)/.test(
+    /function\s+isStaff\(\)\s*\{[\s\S]*?staffProfile\(\)\.get\('role',\s*null\)\s*in\s*\['OWNER',\s*'MANAGER',\s*'CASHIER',\s*'WAITER'\]/.test(
       rulesText
     ),
     true,
-    '/users/{userId} create must reject role/isStaff/permissions'
+    'isStaff() must verify active explicit POS role or isStaff flag'
   );
   assert.equal(
-    /match\s+\/users\/\{userId\}[\s\S]*?!request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasAny\(\['role',\s*'isStaff',\s*'permissions'\]\)/.test(
+    /match\s+\/users\/\{userId\}[\s\S]*?!request\.resource\.data\.keys\(\)\.hasAny\(\['role',\s*'isStaff',\s*'active',\s*'permissions'\]\)/.test(
       rulesText
     ),
     true,
-    '/users/{userId} update must reject role/isStaff/permissions'
+    '/users/{userId} create must reject role/isStaff/active/permissions'
+  );
+  assert.equal(
+    /match\s+\/users\/\{userId\}[\s\S]*?!request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasAny\(\['role',\s*'isStaff',\s*'active',\s*'permissions'\]\)/.test(
+      rulesText
+    ),
+    true,
+    '/users/{userId} update must reject role/isStaff/active/permissions'
   );
 });
 
@@ -520,4 +522,35 @@ test('US-3 / US-8 | TC-039 [AUD-014 / AUD-015 / AUD-022]: JS modules parse clean
   const { getFriendlyAuthError } = loadAppLogic();
   assert.equal(getFriendlyAuthError({ code: 'auth/wrong-password' }), 'Invalid email or password.');
   assert.equal(getFriendlyAuthError({ message: 'Firebase: internal secret stack' }), 'Authentication failed. Please try again.');
+});
+
+test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase RBAC roles, and setting_ownerPinHash guard', () => {
+  for (const helper of ['isStaffActive()', 'isManagerOrOwner()', 'isCashierOrAbove()']) {
+    assert.equal(rulesText.includes(helper), true, `Missing POS helper ${helper}`);
+  }
+  for (const role of ['OWNER', 'MANAGER', 'CASHIER', 'WAITER']) {
+    assert.equal(rulesText.includes(`'${role}'`), true, `Missing POS role ${role}`);
+  }
+  const posCollections = [
+    'suppliers',
+    'stockIn',
+    'supplierPayments',
+    'supplierLedger',
+    'expenses',
+    'deliveries',
+    'staff',
+    'attendance',
+    'leaves',
+    'salaryPayments',
+    'advancePayments',
+    'auditLogs',
+    'heldOrders',
+    'tableOrders',
+    'recipes',
+    'customers',
+  ];
+  for (const col of posCollections) {
+    assert.equal(new RegExp(`match\\s+\\/${col}\\/\\{`).test(rulesText), true, `Missing POS collection rule /${col}`);
+  }
+  assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });

@@ -7,14 +7,14 @@ service firebase.storage {
         }
 
         // Keep in sync with firestore.rules isAdmin() and adminwebsite.js ADMIN_EMAILS.
+        // POS app does not upload to Firebase Storage; only website promotional banners live here.
         function isAdmin() {
             return isSignedIn() && (
                 request.auth.token.get('admin', false) == true ||
-                (
-                    request.auth.token.email_verified == true &&
-                    request.auth.token.email in ["owner@hungrybirds.com"]
-                ) ||
-                request.auth.token.email in ["rehan@hungrybirds-pos.local"]
+                request.auth.token.email in [
+                    "owner@hungrybirds.com",
+                    "rehan@hungrybirds-pos.local"
+                ]
             );
         }
 

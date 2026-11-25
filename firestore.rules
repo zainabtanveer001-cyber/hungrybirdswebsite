@@ -7,51 +7,74 @@ service cloud.firestore {
             return request.auth != null;
         }
 
+        function hasStaffProfile() {
+            return isSignedIn()
+                && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+        }
+
+        function staffProfile() {
+            return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+        }
+
+        function isStaffActive() {
+            return hasStaffProfile() && staffProfile().get('active', true) != false;
+        }
+
         // Keep email lists synchronized with ADMIN_EMAILS in adminwebsite.js.
-        // Prefer custom claims (request.auth.token.admin == true) or verified email.
+        // Recognizes custom claim admin == true, configured owner/admin emails, or active POS OWNER profile.
         function isAdmin() {
             return isSignedIn() && (
                 request.auth.token.get('admin', false) == true ||
-                (
-                    request.auth.token.email_verified == true &&
-                    request.auth.token.email in [
-                        "owner@hungrybirds.com"
-                    ]
-                ) ||
+                request.auth.token.email in [
+                    "owner@hungrybirds.com"
+                ] ||
                 (
                     request.auth.token.email in [
                         "rehan@hungrybirds-pos.local"
                     ] &&
-                    exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['owner', 'admin']
-                )
+                    isStaffActive() &&
+                    staffProfile().get('role', null) in ['OWNER', 'owner', 'admin']
+                ) ||
+                (isStaffActive() && staffProfile().get('role', null) == 'OWNER')
             );
         }
 
-        // Staff accounts must be explicitly provisioned by an admin with a staff role/flag.
-        // Customer loyalty profile docs in /users/{uid} cannot grant staff privileges.
+        function isManagerOrOwner() {
+            return isAdmin() || (
+                isStaffActive()
+                && staffProfile().get('role', null) in ['OWNER', 'MANAGER']
+            );
+        }
+
+        function isCashierOrAbove() {
+            return isAdmin() || (
+                isStaffActive()
+                && staffProfile().get('role', null) in ['OWNER', 'MANAGER', 'CASHIER']
+            );
+        }
+
+        // Staff accounts have an active profile doc keyed by their auth uid carrying an explicit POS role.
+        // Customer loyalty docs in /users/{uid} cannot set role/isStaff/active, so customers cannot become staff.
         function isStaff() {
             return isAdmin() || (
-                isSignedIn() &&
-                exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                (
-                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isStaff', false) == true ||
-                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in [
-                        'owner', 'admin', 'manager', 'staff', 'cashier', 'employee'
-                    ]
+                isStaffActive()
+                && (
+                    staffProfile().get('isStaff', false) == true ||
+                    staffProfile().get('role', null) in ['OWNER', 'MANAGER', 'CASHIER', 'WAITER']
                 )
             );
         }
 
-        // Public customer website menu & categories; POS staff manage writes.
+        // The customer website needs to display the published POS menu.
+        // Managers and owners remain responsible for menu/category catalog writes.
         match /menu/{menuId} {
             allow read: if true;
-            allow write: if isStaff();
+            allow write: if isManagerOrOwner();
         }
 
         match /categories/{categoryId} {
             allow read: if true;
-            allow write: if isStaff();
+            allow write: if isManagerOrOwner();
         }
 
         // Promotional banners displayed publicly on the website; managed by admin only.
@@ -65,7 +88,8 @@ service cloud.firestore {
         match /onlineOrders/{orderId} {
             allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid || isStaff());
 
-            allow create: if isSignedIn() &&
+            allow create: if isStaff() || (
+                isSignedIn() &&
                 request.resource.data.customerUid == request.auth.uid &&
                 request.resource.data.status == 'PENDING' &&
                 request.resource.data.source == 'website' &&
@@ -83,7 +107,8 @@ service cloud.firestore {
                 request.resource.data.customer is map &&
                 request.resource.data.customer.phone is string &&
                 request.resource.data.customer.phone.size() >= 7 &&
-                request.resource.data.customer.phone.size() <= 20;
+                request.resource.data.customer.phone.size() <= 20
+            );
 
             allow update: if isStaff();
             allow delete: if isAdmin();
@@ -107,24 +132,30 @@ service cloud.firestore {
             allow delete: if isAdmin();
         }
 
-        // POS-only collections: never touched by the customer website.
+        // POS sales & inventory collections with POS role granularity.
         match /sales/{saleId} {
-            allow read, write: if isStaff();
+            allow read: if isStaff();
+            allow create: if isCashierOrAbove();
+            allow update: if isStaff();
+            allow delete: if isManagerOrOwner();
         }
 
         match /inventory/{itemId} {
-            allow read, write: if isStaff();
+            allow read: if isStaff();
+            allow update: if isCashierOrAbove();
+            allow create, delete: if isManagerOrOwner();
         }
 
-        // POS username lookup by exact key only; collection listing blocked to prevent staff enumeration.
+        // Public username -> auth email lookup used by POS login screen (.doc(username).get()).
+        // Listing disabled to prevent staff enumeration.
         match /usernameDirectory/{usernameLower} {
             allow get: if true;
             allow list: if false;
             allow write: if isAdmin();
         }
 
-        // Customer loyalty counters and staff profile docs.
-        // Customers may only create/increment their own loyalty counter and can never set staff role/flags.
+        // Per-customer loyalty tracking (orderCount) and staff profile docs (keyed by uid).
+        // Customers may only create/increment their own loyalty counter and can never set role/isStaff/active.
         match /users/{userId} {
             allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isStaff());
 
@@ -132,7 +163,7 @@ service cloud.firestore {
                 isSignedIn() &&
                 request.auth.uid == userId &&
                 request.resource.data.keys().hasOnly(['email', 'orderCount', 'updatedAt']) &&
-                !request.resource.data.keys().hasAny(['role', 'isStaff', 'permissions']) &&
+                !request.resource.data.keys().hasAny(['role', 'isStaff', 'active', 'permissions']) &&
                 request.resource.data.get('orderCount', 0) in [0, 1]
             );
 
@@ -140,7 +171,7 @@ service cloud.firestore {
                 isSignedIn() &&
                 request.auth.uid == userId &&
                 request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'orderCount', 'updatedAt']) &&
-                !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isStaff', 'permissions']) &&
+                !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isStaff', 'active', 'permissions']) &&
                 request.resource.data.orderCount == resource.data.get('orderCount', 0) + 1
             );
 
@@ -157,11 +188,11 @@ service cloud.firestore {
 
             allow update: if isAdmin() || (
                 isSignedIn() &&
-                resource.data.active == true &&
+                resource.data.get('active', true) == true &&
                 (
                     (
                         resource.data.singleUse == true &&
-                        resource.data.used == false &&
+                        resource.data.get('used', false) == false &&
                         resource.data.assignedTo == request.auth.uid &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'used']) &&
                         request.resource.data.active == false &&
@@ -169,7 +200,7 @@ service cloud.firestore {
                     ) ||
                     (
                         resource.data.singleUse == false &&
-                        resource.data.assignedTo == null &&
+                        (!('assignedTo' in resource.data) || resource.data.assignedTo == null) &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']) &&
                         request.resource.data.usedCount == resource.data.get('usedCount', 0) + 1 &&
                         (resource.data.get('maxUses', null) == null || request.resource.data.usedCount <= resource.data.maxUses)
@@ -178,6 +209,86 @@ service cloud.firestore {
             );
 
             allow delete: if isAdmin();
+        }
+
+        // POS-only collections: synced from local Dexie via echo-guarded onSnapshot.
+        // All active staff can read/sync; back-office mutations require Manager/Owner.
+        match /suppliers/{supplierId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /stockIn/{stockInId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /supplierPayments/{paymentId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /supplierLedger/{ledgerId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /expenses/{expenseId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /deliveries/{deliveryId} {
+            allow read, write: if isStaff();
+        }
+
+        match /staff/{staffId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /attendance/{attendanceId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /leaves/{leaveId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /salaryPayments/{paymentId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /advancePayments/{advanceId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /auditLogs/{logId} {
+            allow read, create: if isStaff();
+            allow update, delete: if isAdmin();
+        }
+
+        match /heldOrders/{orderId} {
+            allow read, write: if isStaff();
+        }
+
+        match /tableOrders/{orderId} {
+            allow read: if isStaff();
+            allow write: if orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff();
+        }
+
+        match /recipes/{recipeId} {
+            allow read: if isStaff();
+            allow write: if isManagerOrOwner();
+        }
+
+        match /customers/{customerId} {
+            allow read: if isStaff();
+            allow write: if isCashierOrAbove();
         }
     }
 }
