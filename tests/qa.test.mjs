@@ -64,6 +64,8 @@ function loadAppLogic(initialState = {}) {
     'getStatusLabel',
     'getProgressPercentage',
     'renderMyCoupons',
+    'fromFirestoreRestValue',
+    'parseFirestoreRestDoc',
   ];
   const snippets = fnNames.map((n) => extractFunctionSource(appJs, n)).join('\n\n');
   const elements = initialState.elements || {};
@@ -75,6 +77,9 @@ function loadAppLogic(initialState = {}) {
     Math,
     Number,
     String,
+    Boolean,
+    Array,
+    Object,
   };
   vm.createContext(context);
   vm.runInContext(snippets, context);
@@ -508,7 +513,7 @@ test('US-3 / US-8 | TC-039 [AUD-014 / AUD-015 / AUD-022]: JS modules parse clean
     [
       '--experimental-vm-modules',
       '-e',
-      "import('node:vm').then(async({SourceTextModule})=>{const fs=await import('node:fs');for(const f of ['firebase-config.js','appwebsite.js','adminwebsite.js']){new SourceTextModule(fs.readFileSync(f,'utf8'));}})",
+      "import('node:vm').then(async({SourceTextModule,Script})=>{const fs=await import('node:fs');for(const f of ['firebase-config.js','appwebsite.js','adminwebsite.js']){new SourceTextModule(fs.readFileSync(f,'utf8'));}for(const s of ['sw-register.js','sw.js']){new Script(fs.readFileSync(s,'utf8'));}})",
     ],
     { cwd: ROOT, stdio: 'pipe' }
   );
@@ -553,4 +558,59 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
     assert.equal(new RegExp(`match\\s+\\/${col}\\/\\{`).test(rulesText), true, `Missing POS collection rule /${col}`);
   }
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
+});
+
+test('US-8 | TC-041: sw-register.js heals legacy pre-v5 caches before module boot, sw.js v5 skips cross-origin requests, and vercel.json sets no-cache on SW scripts', () => {
+  const swRegisterJs = readRepoFile('sw-register.js');
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v5'), true);
+  assert.equal(swRegisterJs.includes('caches.delete'), true);
+  assert.equal(swRegisterJs.includes('reg.unregister()'), true);
+  assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
+
+  const swRegIdx = indexHtml.indexOf('src="sw-register.js"');
+  const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
+  assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
+
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v5'"), true);
+  assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
+
+  const swHeaderRule = (vercelJson.headers || []).find((h) => h.source === '/(sw|sw-register)\\.js');
+  assert.ok(swHeaderRule, 'Missing no-cache header rule for /sw.js and /sw-register.js in vercel.json');
+  assert.equal(
+    swHeaderRule.headers.some((h) => h.key === 'Cache-Control' && h.value.includes('no-cache')),
+    true
+  );
+});
+
+test('US-1 / US-8 | TC-042: Firestore uses auto-detected long-polling + IndexedDB cache and falls back to HTTPS REST on cold-cache WatchStream timeouts', () => {
+  assert.equal(appJs.includes('experimentalAutoDetectLongPolling: true'), true);
+  assert.equal(appJs.includes('persistentLocalCache'), true);
+  assert.equal(adminJs.includes('experimentalAutoDetectLongPolling: true'), true);
+  assert.equal(appJs.includes('menuSnapshot.empty && Boolean(menuSnapshot.metadata && menuSnapshot.metadata.fromCache)'), true);
+  assert.equal(appJs.includes('fetchCollectionViaRest("menu"'), true);
+
+  const { parseFirestoreRestDoc } = loadAppLogic();
+  const parsed = parseFirestoreRestDoc({
+    name: 'projects/hungry-birds-3e16f/databases/(default)/documents/menu/item_zinger',
+    fields: {
+      name: { stringValue: 'Zinger Burger' },
+      price: { integerValue: '450' },
+      rating: { doubleValue: 4.8 },
+      active: { booleanValue: true },
+      notes: { nullValue: null },
+      tags: { arrayValue: { values: [{ stringValue: 'spicy' }, { stringValue: 'popular' }] } },
+      meta: { mapValue: { fields: { kcal: { integerValue: '620' } } } },
+      recipeRef: { referenceValue: 'projects/hungry-birds-3e16f/databases/(default)/documents/recipes/rec_42' },
+    },
+  });
+
+  assert.equal(parsed.id, 'item_zinger');
+  assert.equal(parsed.data.name, 'Zinger Burger');
+  assert.equal(parsed.data.price, 450);
+  assert.equal(parsed.data.rating, 4.8);
+  assert.equal(parsed.data.active, true);
+  assert.equal(parsed.data.notes, null);
+  assert.deepEqual(Array.from(parsed.data.tags), ['spicy', 'popular']);
+  assert.equal(parsed.data.meta.kcal, 620);
+  assert.equal(parsed.data.recipeRef.id, 'rec_42');
 });

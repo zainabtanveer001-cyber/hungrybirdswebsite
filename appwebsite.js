@@ -9,7 +9,9 @@ import {
     signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-    getFirestore,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
     collection,
     addDoc,
     getDocs,
@@ -27,9 +29,28 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
+if (typeof window !== "undefined") {
+    window.__HB_APP_BOOTED__ = true;
+}
+
+function createFirestoreClient(firebaseApp) {
+    try {
+        return initializeFirestore(firebaseApp, {
+            experimentalAutoDetectLongPolling: true,
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
+    } catch {
+        return initializeFirestore(firebaseApp, {
+            experimentalAutoDetectLongPolling: true
+        });
+    }
+}
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = createFirestoreClient(app);
 
 // ===== State =====
 let currentUser = null;
@@ -285,26 +306,146 @@ function getCategoryId(data) {
     return String(category);
 }
 
-async function loadMenuFromFirestore() {
-    const [categorySnapshot, menuSnapshot] = await Promise.all([
-        getDocs(collection(db, "categories")),
-        getDocs(collection(db, "menu"))
-    ]);
+function fromFirestoreRestValue(val) {
+    if (!val || typeof val !== "object") return undefined;
+    if ("nullValue" in val) return null;
+    if ("booleanValue" in val) return Boolean(val.booleanValue);
+    if ("integerValue" in val) return Number(val.integerValue);
+    if ("doubleValue" in val) return Number(val.doubleValue);
+    if ("stringValue" in val) return String(val.stringValue);
+    if ("timestampValue" in val) return String(val.timestampValue);
+    if ("bytesValue" in val) return String(val.bytesValue);
+    if ("referenceValue" in val) {
+        const refPath = String(val.referenceValue);
+        return {
+            id: refPath.split("/").pop() || "",
+            path: refPath
+        };
+    }
+    if ("geoPointValue" in val) return val.geoPointValue;
+    if ("arrayValue" in val) {
+        const items = (val.arrayValue && val.arrayValue.values) || [];
+        return items.map((entry) => fromFirestoreRestValue(entry));
+    }
+    if ("mapValue" in val) {
+        const out = {};
+        const fields = (val.mapValue && val.mapValue.fields) || {};
+        for (const [k, v] of Object.entries(fields)) {
+            out[k] = fromFirestoreRestValue(v);
+        }
+        return out;
+    }
+    return undefined;
+}
 
-    const dbCategories = categorySnapshot.docs
-        .map(docSnap => ({
-            id: docSnap.id,
-            name: firstDefined(docSnap.data(), ["name", "title", "label"])
+function parseFirestoreRestDoc(restDoc) {
+    if (!restDoc || typeof restDoc.name !== "string") return null;
+    const id = restDoc.name.split("/").pop() || "";
+    if (!id) return null;
+    const data = {};
+    const fields = restDoc.fields || {};
+    for (const [key, rawVal] of Object.entries(fields)) {
+        data[key] = fromFirestoreRestValue(rawVal);
+    }
+    return { id, data };
+}
+
+async function fetchCollectionViaRest(collectionName, pageSize = 300) {
+    const docs = [];
+    let pageToken = "";
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseConfig.projectId)}/databases/(default)/documents/${encodeURIComponent(collectionName)}`;
+
+    do {
+        const params = new URLSearchParams({
+            pageSize: String(pageSize),
+            key: firebaseConfig.apiKey
+        });
+        if (pageToken) params.set("pageToken", pageToken);
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 25000);
+        let response;
+        try {
+            response = await fetch(`${baseUrl}?${params.toString()}`, {
+                method: "GET",
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timer);
+        }
+
+        if (!response.ok) {
+            const err = new Error(`Firestore REST ${collectionName} failed (${response.status})`);
+            err.code = (response.status === 401 || response.status === 403)
+                ? "permission-denied"
+                : "unavailable";
+            throw err;
+        }
+
+        const payload = await response.json();
+        for (const rawDoc of payload.documents || []) {
+            const parsed = parseFirestoreRestDoc(rawDoc);
+            if (parsed) docs.push(parsed);
+        }
+        pageToken = payload.nextPageToken || "";
+    } while (pageToken);
+
+    return docs;
+}
+
+async function loadMenuFromFirestore() {
+    let categoryRecords = null;
+    let menuRecords = null;
+
+    try {
+        const [categorySnapshot, menuSnapshot] = await Promise.all([
+            getDocs(collection(db, "categories")),
+            getDocs(collection(db, "menu"))
+        ]);
+
+        const isColdCacheTimeout =
+            menuSnapshot.empty && Boolean(menuSnapshot.metadata && menuSnapshot.metadata.fromCache);
+
+        if (!isColdCacheTimeout) {
+            categoryRecords = categorySnapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                data: docSnap.data()
+            }));
+            menuRecords = menuSnapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                data: docSnap.data()
+            }));
+        }
+    } catch (sdkError) {
+        if (sdkError && sdkError.code === "permission-denied") {
+            throw sdkError;
+        }
+        console.warn("Firestore SDK menu fetch degraded, trying HTTPS REST fallback:", sdkError);
+    }
+
+    if (!menuRecords) {
+        const [restCategories, restMenu] = await Promise.all([
+            fetchCollectionViaRest("categories", 100),
+            fetchCollectionViaRest("menu", 300)
+        ]);
+        categoryRecords = restCategories;
+        menuRecords = restMenu;
+    }
+
+    const dbCategories = categoryRecords
+        .map(record => ({
+            id: record.id,
+            name: firstDefined(record.data, ["name", "title", "label"])
         }))
         .filter(category => category.name);
 
     const rawDocsById = new Map(
-        menuSnapshot.docs.map(docSnap => [docSnap.id, docSnap.data()])
+        menuRecords.map(record => [record.id, record.data])
     );
 
-    const dbMenuItems = menuSnapshot.docs
-        .map(docSnap => {
-            const data = docSnap.data();
+    const dbMenuItems = menuRecords
+        .map(record => {
+            const data = record.data;
             const itemName = firstDefined(
                 data,
                 ["name", "displayName", "title", "itemName"]
@@ -321,8 +462,8 @@ async function loadMenuFromFirestore() {
             );
 
             return {
-                id: docSnap.id,
-                menuItemId: docSnap.id,
+                id: record.id,
+                menuItemId: record.id,
                 recipeId: typeof recipeId === "object" && recipeId !== null
                     ? recipeId.id || null
                     : recipeId,
@@ -1950,6 +2091,8 @@ document.addEventListener("click", (event) => {
             .catch(() => showToast("Could not copy code automatically.", "fa-circle-exclamation"));
     } else if (action === "go-slide" && slide !== undefined) {
         goToBannerSlide(Number(slide));
+    } else if (action === "retry-menu") {
+        initMenu();
     } else if (action === "reload-page") {
         location.reload();
     }
@@ -2433,17 +2576,8 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
     `;
 }
 
-// ===== Service Worker Registration =====
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js")
-            .catch(err => {
-                console.warn("Service Worker registration failed:", err);
-            });
-    });
-}
-
 // ===== Banner Carousel =====
+// (Service Worker registration is handled early in sw-register.js)
 let bannerData = [];
 let currentBannerIndex = 0;
 let bannerInterval = null;
@@ -2457,11 +2591,20 @@ async function loadBanners() {
             )
         );
 
-        bannerData = snapshot.docs
-            .map(docSnap => ({
+        let rawBanners;
+        if (snapshot.empty && snapshot.metadata && snapshot.metadata.fromCache) {
+            const restBanners = await fetchCollectionViaRest("banners", 50);
+            rawBanners = restBanners
+                .filter(record => record.data.active === true)
+                .map(record => ({ id: record.id, ...record.data }));
+        } else {
+            rawBanners = snapshot.docs.map(docSnap => ({
                 id: docSnap.id,
                 ...docSnap.data()
-            }))
+            }));
+        }
+
+        bannerData = rawBanners
             .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
         renderBannerCarousel();
@@ -2904,11 +3047,19 @@ async function initMenu() {
         );
 
         const isPermissionError =
-            error.code === "permission-denied";
+            error && error.code === "permission-denied";
+        const isNetworkError =
+            Boolean(error) && (
+                error.code === "unavailable" ||
+                error.name === "AbortError" ||
+                /fetch|network|offline|timed?\s*out/i.test(String(error.message || ""))
+            );
 
         const errorMessage = isPermissionError
             ? "The online menu is not publicly readable yet. Please contact the restaurant."
-            : "Please refresh and try again.";
+            : isNetworkError
+                ? "Connection is slow or offline. Please check your internet connection and tap Retry."
+                : "Please tap Retry to load the menu again.";
 
         $("menuGrid").innerHTML = `
             <div class="col-span-full py-20 text-center">
@@ -2927,10 +3078,10 @@ async function initMenu() {
 
                 <button
                     type="button"
-                    data-action="reload-page"
+                    data-action="retry-menu"
                     class="mt-5 px-5 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-orange-500 transition-colors pressable"
                 >
-                    Refresh
+                    Retry
                 </button>
 
             </div>

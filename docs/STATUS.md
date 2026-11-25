@@ -1,9 +1,9 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Post-Audit Remediation & Regression Verification Complete (Ready for Firebase + Vercel Deployment)
+- **Current Phase:** Post-Deploy Hardening & Live Connectivity Recovery Complete
 - **Last Updated:** 2026-11-25
-- **Branch / Commit:** `main` @ `a8aebf3` *(plus this documentation slice)*
-- **Automated Regression (`npm test`):** **PASS (`33/33` tests green)**
+- **Branch:** `main` (pushed to `origin/main`)
+- **Automated Regression (`npm test`):** **PASS (`36/36` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
 - **CSS Build (`npm run build:css`):** **PASS (`styles.css` `42,059` bytes)**
 
@@ -11,23 +11,22 @@
 
 ## Done
 - **Repo Hygiene & Dependencies (`d3f3c43`):** Added `.gitignore` and `.env.example`, untracked `2,386` committed `node_modules` files, deleted dead `output.css`, cleaned `package.json`, and ran `npm audit fix` (`0 vulnerabilities`).
-- **Firebase Hardening (`01c9b59`):** Hardened [firestore.rules](../firestore.rules) (`isStaff()` role verification, `/users` write restrictions, removed `|| true` on `onlineOrders`, added non-PII `/orderTracking`, locked `coupons` creation & redemption, blocked `usernameDirectory` listing, added `/banners` rules, synced `isAdmin()`), added [storage.rules](../storage.rules), [firestore.indexes.json](../firestore.indexes.json), [firebase.json](../firebase.json), Cloud Functions in [functions/index.js](../functions/index.js), and [docs/adr/0001-firebase-security-hardening.md](./adr/0001-firebase-security-hardening.md).
-- **App Security, Functional & A11y Fixes (`767a7bc`):** Extracted [firebase-config.js](../firebase-config.js), removed Tailwind CDN from `admin.html` & `google-maps-embed.html`, added Font Awesome sha384 SRI, eliminated XSS (`escapeHTML` + `data-*` event delegation), fixed cart badge sync on reload/repeat/order, fixed modal `hidden`/ARIA/`Escape`/`Enter`/backdrop/`z-40` CTA layering, fixed `rounde  d-[1.5rem]`/`backdrop-blur-xs`, added SVG favicon, fixed Takeaway status label & address, fixed loyalty modulo UI & local end-of-day expiry, enforced banner upload bounds & Storage cleanup, and wired full sign-out teardown.
-- **PWA, Styles & Security Headers (`241666e`):** Fixed `sw.js` case-sensitive asset paths (`hungrybirds-cache-v3`), added CSP/HSTS/XFO headers in [vercel.json](../vercel.json), and rebuilt `styles.css`.
-- **Verification (`a8aebf3` + Live Browser):** Expanded [tests/qa.test.mjs](../tests/qa.test.mjs) (`33/33` pass) and re-verified desktop (`1280×800`) and mobile (`375×812`) flows on `http://127.0.0.1:4173` (zero `404`s, zero CDN Tailwind requests, cart reload sync, modal keyboard/backdrop, rounded mobile card, unobstructed `Place Order`).
-- **Docs Updated:** [docs/qa/BUGS.md](./qa/BUGS.md), [docs/qa/TEST_PLAN.md](./qa/TEST_PLAN.md), [docs/audit/AUDIT_REPORT.md](./audit/AUDIT_REPORT.md), [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md).
+- **Firebase & POS-Compatible Rules (`01c9b59`, `94c9bf2` — Published Live):** Hardened [firestore.rules](../firestore.rules) while preserving all 16 POS collections and uppercase POS RBAC (`OWNER`, `MANAGER`, `CASHIER`, `WAITER`, `isStaffActive`, `isManagerOrOwner`, `isCashierOrAbove`, `setting_ownerPinHash`); added [storage.rules](../storage.rules), [firestore.indexes.json](../firestore.indexes.json), [firebase.json](../firebase.json), Cloud Functions in [functions/index.js](../functions/index.js), and [docs/adr/0001-firebase-security-hardening.md](./adr/0001-firebase-security-hardening.md).
+- **App Security, Functional & A11y Fixes (`767a7bc`, `241666e`):** Extracted [firebase-config.js](../firebase-config.js), removed Tailwind CDN from `admin.html` & `google-maps-embed.html`, added Font Awesome sha384 SRI, eliminated XSS (`escapeHTML` + `data-*` event delegation), fixed cart badge sync on reload/repeat/order, fixed modal `hidden`/ARIA/`Escape`/`Enter`/backdrop/`z-40` CTA layering, fixed `rounde  d-[1.5rem]`/`backdrop-blur-xs`, added SVG favicon, fixed Takeaway status label & address, fixed loyalty modulo UI & local end-of-day expiry, enforced banner upload bounds & Storage cleanup, wired sign-out teardown, and rebuilt `styles.css`.
+- **Live Vercel CSP, Self-Healing Service Worker `v5` & Firestore Transport Resilience (`7044b71` + latest fix):**
+  - Expanded `connect-src` in [vercel.json](../vercel.json) and added `Cache-Control: no-cache, no-store, must-revalidate` for `/(sw|sw-register)\.js`.
+  - Added standalone [sw-register.js](../sw-register.js) before `appwebsite.js` in [index.html](../index.html) to automatically purge pre-`v5` legacy Service Workers (`hungrybirds-cache-v1`..`v4`) that trapped browsers under an older worker `connect-src` CSP, and narrowed [sw.js](../sw.js) (`hungrybirds-cache-v5`) to same-origin shell assets only.
+  - Replaced `getFirestore` with `initializeFirestore(..., { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })` in [appwebsite.js](../appwebsite.js) (and `experimentalAutoDetectLongPolling: true` in [adminwebsite.js](../adminwebsite.js)), eliminated the composite index requirement in `loadBanners()`, and added a direct HTTPS Firestore REST API fallback (`fetchCollectionViaRest`) when WebChannel hits a 10-second `WatchStream` cold-cache timeout.
+- **Verification:** `36/36` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-042`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors).
 
-## Next (External Deployment Actions Required)
-1. Deploy unified `firestore.rules`, `firestore.indexes.json`, and `storage.rules` (and `functions/` if on Blaze plan) to Firebase project `hungry-birds-3e16f` (`firestore.rules` now preserves all 16 POS collections and uppercase `OWNER`/`MANAGER`/`CASHIER`/`WAITER` RBAC from `hungrybirdspos`).
-2. Sync the updated `firestore.rules` back to the `hungrybirdspos` repository so both repos stay identical.
-3. Deploy static site to Vercel and complete Google Cloud Console hardening (API key HTTP referrers, Firebase App Check).
-4. Smoke-test live authenticated checkout, banner carousel, guest order tracking, and POS login/sync against deployed Firebase rules.
+## Next (Optional Operational Follow-Ups)
+1. Sync the unified [firestore.rules](../firestore.rules) file into the sibling `hungrybirdspos` repo so both repositories track the identical rules source.
+2. Deploy `functions/` (`firebase deploy --only functions`) if server-side loyalty minting and `/orderTracking` projection are desired (requires Firebase Blaze plan), and configure Google Cloud Console HTTP referrer restrictions + Firebase App Check.
 
 ## Known Gaps / External Scope
-- **Cloud Deployment Pending:** Updated `firestore.rules`, `storage.rules`, `firestore.indexes.json`, and `functions/` are committed locally but **not yet deployed** to live Firebase project `hungry-birds-3e16f` (until deployed, live `banners` and guest order tracking queries on `hungry-birds-3e16f` still return `permission-denied`).
-- **Live Authenticated Flows:** Live order submission, coupon redemption, Past Orders / My Coupons, and Admin CRUD were verified via static contracts/unit tests rather than live writes to avoid mutating production Firebase data.
-- **POS Legacy Menu Images:** Base64 `data:image/...` strings inside `/menu` documents originate from the separate POS app and remain an operational migration item.
-- **Footer Email Confirmation:** `contact@hungerbirds.rest` in [index.html](../index.html) was kept per commit `80d62d6` — confirm whether it should stay or change to `hungrybirds`.
+- **Live Authenticated Mutation Flows:** Live order placement, coupon redemption, and Admin writes were verified via unit/rules/contract tests rather than live production writes to avoid polluting `hungry-birds-3e16f`.
+- **POS Legacy Menu Images:** Base64 `data:image/jpeg;base64,...` strings inside `/menu` documents originate from the POS app; migrating them to Firebase Storage URLs in the POS will further shrink initial menu payload size.
+- **Browser Extension Noise (`share-modal.js`):** Console errors mentioning `share-modal.js:1` originate from a local browser extension in the user's browser, not repository code (verify in an Incognito window).
 
 ## How to Run Locally & Run Tests
 - **Build CSS:** `npm run build:css`
@@ -35,6 +34,6 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
-- **2026-11-25 (Remediation & Regression):** Fixed all 22 QA bugs & 22 Audit findings across commits `d3f3c43`–`a8aebf3`; verified `33/33` tests passing, `0` npm audit vulnerabilities, and live desktop/mobile browser regression clean; added [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md) and [docs/adr/0001-firebase-security-hardening.md](./adr/0001-firebase-security-hardening.md).
-- **2026-11-25 (Phase 5 Audit):** Independent security and quality audit completed against `4fbff72`; added [docs/audit/AUDIT_REPORT.md](./audit/AUDIT_REPORT.md) (`6 Critical`, `7 High`, `6 Medium`, `3 Low` — Gate **FAIL**).
-- **2026-11-25 (Phase 4 QA):** Live desktop/mobile browser QA and automated suite [tests/qa.test.mjs](../tests/qa.test.mjs) completed against `4fbff72` (`7/26` passed; `22` open bugs in [docs/qa/BUGS.md](./qa/BUGS.md) — Gate **FAIL**).
+- **2026-11-25 (SW `v5` Self-Healing & Firestore Long-Polling/REST Fallback):** Added `sw-register.js`, updated `sw.js` (`v5`, same-origin only) and `vercel.json` (`no-cache` for SW scripts), enabled Firestore auto-detected long-polling + IndexedDB cache + HTTPS REST fallback in `appwebsite.js`/`adminwebsite.js`, and verified `36/36` tests passing + live browser reload clean.
+- **2026-11-25 (POS Rules Merge & Vercel CSP Fix):** Merged all 16 POS collections and uppercase POS roles into `firestore.rules` (`94c9bf2`, published live) and expanded Vercel CSP + client-side banner sort (`7044b71`).
+- **2026-11-25 (Remediation & Regression):** Fixed all 22 QA bugs & 22 Audit findings across commits `d3f3c43`–`923cb63`.

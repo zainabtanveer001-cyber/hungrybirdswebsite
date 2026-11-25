@@ -8,7 +8,7 @@ import {
     signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-    getFirestore,
+    initializeFirestore,
     collection,
     getDocs,
     getDoc,
@@ -34,7 +34,9 @@ import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true
+});
 const storage = getStorage(app);
 
 // Keep this list synchronized with isAdmin() in firestore.rules
