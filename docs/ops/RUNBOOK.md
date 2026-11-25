@@ -15,7 +15,7 @@ npm ci
 # Rebuild minified Tailwind CSS (styles.css)
 npm run build:css
 
-# Run automated QA & security regression suite (43 tests)
+# Run automated QA & security regression suite (45 tests)
 npm test
 
 # Verify zero known dependency vulnerabilities
@@ -63,9 +63,10 @@ npx firebase-tools deploy --only functions --project hungry-birds-3e16f
 
 ## 4. Deploy Static Website + AI Proxy (Vercel)
 
-1. Verify `styles.css` is up to date (`npm run build:css`) and `npm test` passes (`43/43`).
-2. Deploy via Vercel CLI or connected GitHub branch (`outputDirectory: "."`, Serverless Function `/api/chat` in [api/chat.js](../../api/chat.js), security + cache headers in [vercel.json](../../vercel.json)).
-3. Verify HTTP response headers (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) on `/` and `/admin.html`, and `Cache-Control: no-store` on `/api/chat`.
+1. Verify `styles.css` is up to date (`npm run build:css`) and `npm test` passes (`45/45`).
+2. Ensure `/aiConfig/{docId}` rule from [firestore.rules](../../firestore.rules) (`allow read: if true; allow write: if isAdmin();`) is published to Firebase project `hungry-birds-3e16f` so the **AI Training** tab in [admin.html](../../admin.html) can save `/aiConfig/knowledge`.
+3. Deploy via Vercel CLI or connected GitHub branch (Serverless Function `/api/chat` in [api/chat.js](../../api/chat.js), security + cache headers in [vercel.json](../../vercel.json)).
+4. Verify HTTP response headers (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) on `/` and `/admin.html`, and `Cache-Control: no-store` on `/api/chat`.
 
 ### 4b. Enable Free Google AI Studio Gemini Key (3 Minutes, \$0/Month)
 

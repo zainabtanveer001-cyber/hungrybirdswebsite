@@ -26,13 +26,39 @@ function getCategoryLookup(categories = []) {
     return map;
 }
 
+export function sanitizeAiKnowledge(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const clip = (val, max) => (typeof val === "string" ? val.trim().slice(0, max) : "");
+    const openingHours = clip(raw.openingHours, 240);
+    const deliveryInfo = clip(raw.deliveryInfo, 400);
+    const foodNotes = clip(raw.foodNotes, 500);
+    const dealsAndUpsells = clip(raw.dealsAndUpsells, 500);
+    const customInstructions = clip(raw.customInstructions, 1000);
+    const faqs = Array.isArray(raw.faqs)
+        ? raw.faqs
+            .slice(0, 15)
+            .map((faq) => ({
+                question: clip(faq?.question, 160),
+                answer: clip(faq?.answer, 350)
+            }))
+            .filter((faq) => faq.question && faq.answer)
+        : [];
+
+    if (!openingHours && !deliveryInfo && !foodNotes && !dealsAndUpsells && !customInstructions && !faqs.length) {
+        return null;
+    }
+
+    return { openingHours, deliveryInfo, foodNotes, dealsAndUpsells, customInstructions, faqs };
+}
+
 export function buildSanitizedAiPayload({
     message,
     history = [],
     menuItems = [],
     categories = [],
     cart = [],
-    orderType = "DELIVERY"
+    orderType = "DELIVERY",
+    knowledge = null
 } = {}) {
     const catLookup = getCategoryLookup(categories);
 
@@ -76,7 +102,8 @@ export function buildSanitizedAiPayload({
         }))
         .filter((entry) => entry.text.length > 0);
 
-    return {
+    const cleanKnowledge = sanitizeAiKnowledge(knowledge);
+    const payload = {
         message: String(message ?? "").trim().slice(0, MAX_MESSAGE_LEN),
         history: sanitizedHistory,
         menu: sanitizedMenu,
@@ -86,6 +113,10 @@ export function buildSanitizedAiPayload({
         },
         orderType: orderType === "TAKEAWAY" ? "TAKEAWAY" : "DELIVERY"
     };
+    if (cleanKnowledge) {
+        payload.knowledge = cleanKnowledge;
+    }
+    return payload;
 }
 
 function getCartSubtotalValue(cart = []) {
@@ -119,14 +150,49 @@ function summarizeMenuCategories(categories = [], menuItems = []) {
     return names;
 }
 
+function findMatchingCustomFaq(lowerMsg, faqs = []) {
+    if (!Array.isArray(faqs) || !faqs.length) return null;
+    const msgWords = new Set(lowerMsg.split(/[^a-z0-9]+/).filter((w) => w.length >= 3));
+    let best = null;
+    let bestScore = 0;
+
+    for (const faq of faqs) {
+        const qLower = String(faq?.question || "").toLowerCase().trim();
+        if (!qLower) continue;
+        if (lowerMsg.includes(qLower) || qLower.includes(lowerMsg)) {
+            return faq;
+        }
+        const qWords = qLower.split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+        const overlap = qWords.filter((w) => msgWords.has(w)).length;
+        if (overlap >= 2 && overlap > bestScore) {
+            bestScore = overlap;
+            best = faq;
+        }
+    }
+    return best;
+}
+
 export function tryLocalFaqAnswer(
     rawMessage,
-    { cart = [], orderType = "DELIVERY", categories = [], menuItems = [] } = {}
+    { cart = [], orderType = "DELIVERY", categories = [], menuItems = [], knowledge = null } = {}
 ) {
     const text = String(rawMessage ?? "").trim();
     if (!text) return null;
 
     const lower = text.toLowerCase();
+    const safeKnowledge = sanitizeAiKnowledge(knowledge);
+
+    if (safeKnowledge?.faqs?.length) {
+        const customFaq = findMatchingCustomFaq(lower, safeKnowledge.faqs);
+        if (customFaq) {
+            return {
+                reply: customFaq.answer,
+                recommendedItemIds: [],
+                actions: [],
+                source: "local"
+            };
+        }
+    }
     const isFoodQuery = looksLikeFoodRecommendationRequest(lower);
     const wordCount = lower.split(/\s+/).filter(Boolean).length;
     const categoryNames = summarizeMenuCategories(categories, menuItems);
@@ -187,6 +253,57 @@ export function tryLocalFaqAnswer(
                 : "Your cart is empty right now. Ask me for meal ideas or browse the menu to add items!",
             recommendedItemIds: [],
             actions: ["OPEN_CART"],
+            source: "local"
+        };
+    }
+
+    if (
+        /\b(timing|timings|open|opening|closing|hours)\b/i.test(lower) &&
+        !(/\b(open cart|open track)\b/i.test(lower)) &&
+        safeKnowledge?.openingHours
+    ) {
+        return {
+            reply: safeKnowledge.openingHours,
+            recommendedItemIds: [],
+            actions: [],
+            source: "local"
+        };
+    }
+
+    if (
+        /\b(delivery fee|delivery charge|delivery charges|delivery area|delivery areas|eta|how long)\b/i.test(lower) &&
+        safeKnowledge?.deliveryInfo
+    ) {
+        return {
+            reply: `${safeKnowledge.deliveryInfo} (Delivery minimum is Rs. ${DELIVERY_MINIMUM_RS}; Takeaway has no minimum.)`,
+            recommendedItemIds: [],
+            actions: ["OPEN_CART"],
+            source: "local"
+        };
+    }
+
+    if (
+        /\b(halal|allergen|allergy|ingredient|spicy|spice|bestseller|best seller|famous|popular)\b/i.test(lower) &&
+        !(/\b(under|budget|mein|tak|rs\.?)\b/i.test(lower)) &&
+        safeKnowledge?.foodNotes
+    ) {
+        return {
+            reply: safeKnowledge.foodNotes,
+            recommendedItemIds: [],
+            actions: [],
+            source: "local"
+        };
+    }
+
+    if (
+        /\b(deal|deals|special|specials|offer|offers|combo)\b/i.test(lower) &&
+        !(/\b(under|budget|mein|tak|rs\.?)\b/i.test(lower)) &&
+        safeKnowledge?.dealsAndUpsells
+    ) {
+        return {
+            reply: safeKnowledge.dealsAndUpsells,
+            recommendedItemIds: [],
+            actions: [],
             source: "local"
         };
     }
@@ -408,6 +525,7 @@ export function initAiAssistant({
     getCategories,
     getCart,
     getOrderType,
+    getAiKnowledge,
     addToCart,
     openTrackOrder,
     openCart,
@@ -615,6 +733,17 @@ export function initAiAssistant({
         fab.focus();
     }
 
+    function pushAssistantResult(result, statusLabel) {
+        history.push({
+            role: "assistant",
+            text: String(result?.reply || result?.text || ""),
+            recommendedItemIds: Array.isArray(result?.recommendedItemIds) ? result.recommendedItemIds : [],
+            actions: Array.isArray(result?.actions) ? result.actions : [],
+            source: result?.source || "local"
+        });
+        if (statusLabel) setStatusLabel(statusLabel);
+    }
+
     async function handleSend(rawText) {
         const message = String(rawText ?? "").trim().slice(0, MAX_MESSAGE_LEN);
         if (!message) return;
@@ -631,30 +760,21 @@ export function initAiAssistant({
         const orderType = getOrderType() || "DELIVERY";
         const menuItems = getMenuItems() || [];
         const categories = getCategories() || [];
+        const knowledge = typeof getAiKnowledge === "function" ? getAiKnowledge() : null;
 
         history.push({ role: "user", text: message });
         input.value = "";
 
-        const faqHit = tryLocalFaqAnswer(message, { cart, orderType, categories, menuItems });
+        const faqHit = tryLocalFaqAnswer(message, { cart, orderType, categories, menuItems, knowledge });
         if (faqHit) {
-            history.push({
-                role: "assistant",
-                text: faqHit.reply,
-                recommendedItemIds: faqHit.recommendedItemIds,
-                actions: faqHit.actions,
-                source: "local"
-            });
-            setStatusLabel("Instant help");
+            pushAssistantResult({ ...faqHit, source: "local" }, "Instant help");
             renderMessages(false);
             return;
         }
 
         if (!menuItems.length) {
             const emptyFallback = buildLocalMenuFallback(message, menuItems, categories, cart, orderType);
-            history.push({
-                role: "assistant",
-                ...emptyFallback
-            });
+            pushAssistantResult(emptyFallback, "Menu helper");
             renderMessages(false);
             return;
         }
@@ -671,7 +791,8 @@ export function initAiAssistant({
                 menuItems,
                 categories,
                 cart,
-                orderType
+                orderType,
+                knowledge
             });
 
             const response = await fetch("/api/chat", {
@@ -682,27 +803,18 @@ export function initAiAssistant({
 
             if (response.ok) {
                 const data = await response.json();
-                history.push({
-                    role: "assistant",
-                    text: String(data.reply || ""),
-                    recommendedItemIds: Array.isArray(data.recommendedItemIds) ? data.recommendedItemIds : [],
-                    actions: Array.isArray(data.actions) ? data.actions : [],
-                    source: "gemini"
-                });
-                setStatusLabel("Gemini AI");
+                pushAssistantResult({ ...data, source: "gemini" }, "Gemini AI");
                 return;
             }
 
             const errData = await response.json().catch(() => null);
             console.warn("[Hungry Birds AI] /api/chat fallback:", response.status, errData?.error || "UNKNOWN");
             const fallback = buildLocalMenuFallback(message, menuItems, categories, cart, orderType);
-            history.push({ role: "assistant", ...fallback });
-            setStatusLabel("Menu helper");
+            pushAssistantResult(fallback, "Menu helper");
         } catch (err) {
             console.warn("[Hungry Birds AI] /api/chat request failed:", err?.name || "Error");
             const fallback = buildLocalMenuFallback(message, menuItems, categories, cart, orderType);
-            history.push({ role: "assistant", ...fallback });
-            setStatusLabel("Menu helper");
+            pushAssistantResult(fallback, "Menu helper");
         } finally {
             isSending = false;
             if (sendBtn) sendBtn.disabled = false;

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hungry Birds - Coupon Admin</title>
+    <title>Hungry Birds - Admin Dashboard</title>
 
     <link
         rel="icon"
@@ -92,10 +92,10 @@
         <div class="flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-black">Admin Dashboard</h1>
-                <p class="text-sm text-gray-500 mt-1">Customers, online orders, and coupons</p>
+                <p class="text-sm text-gray-500 mt-1">Customers, online orders, coupons, banners &amp; AI training</p>
             </div>
             <div class="flex items-center gap-2">
-                <button id="refreshAdminDataBtn" title="Refresh customer and order data" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200" aria-label="Refresh customer and order data">
+                <button id="refreshAdminDataBtn" title="Refresh admin data" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200" aria-label="Refresh admin data">
                     <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                 </button>
                 <button id="adminSignOutBtn" class="text-sm bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200">
@@ -104,6 +104,44 @@
             </div>
         </div>
 
+        <!-- Admin Section Tabs -->
+        <div role="tablist" aria-label="Admin sections" class="flex flex-wrap gap-2">
+            <button
+                type="button"
+                role="tab"
+                id="tabBtnOrders"
+                data-admin-tab="orders"
+                aria-selected="true"
+                aria-controls="adminTabOrders"
+                class="px-4 py-2.5 rounded-2xl text-sm font-bold bg-gray-900 text-white transition-colors"
+            >
+                <i class="fa-solid fa-receipt mr-1.5" aria-hidden="true"></i>Customers &amp; Orders
+            </button>
+            <button
+                type="button"
+                role="tab"
+                id="tabBtnMarketing"
+                data-admin-tab="marketing"
+                aria-selected="false"
+                aria-controls="adminTabMarketing"
+                class="px-4 py-2.5 rounded-2xl text-sm font-bold bg-white text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
+            >
+                <i class="fa-solid fa-tags mr-1.5" aria-hidden="true"></i>Coupons &amp; Banners
+            </button>
+            <button
+                type="button"
+                role="tab"
+                id="tabBtnAi"
+                data-admin-tab="ai"
+                aria-selected="false"
+                aria-controls="adminTabAi"
+                class="px-4 py-2.5 rounded-2xl text-sm font-bold bg-white text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
+            >
+                <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-orange-500" aria-hidden="true"></i>AI Training
+            </button>
+        </div>
+
+        <div id="adminTabOrders" role="tabpanel" aria-labelledby="tabBtnOrders" class="space-y-8">
         <!-- Customers -->
         <section class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
             <div class="flex justify-between items-center mb-4 gap-4">
@@ -123,7 +161,9 @@
             </div>
             <div id="ordersTable" class="space-y-3"></div>
         </section>
+        </div>
 
+        <div id="adminTabMarketing" role="tabpanel" aria-labelledby="tabBtnMarketing" class="hidden space-y-8">
         <!-- Create coupon -->
         <form id="couponForm" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 grid gap-4 sm:grid-cols-2">
             <h2 class="sm:col-span-2 font-bold text-lg">Create Coupon</h2>
@@ -281,6 +321,108 @@
             <h2 class="font-bold text-lg mb-4">Existing Banners</h2>
 
             <div id="bannersTable" class="space-y-2"></div>
+        </div>
+        </div>
+
+        <!-- AI Assistant Training Tab -->
+        <div id="adminTabAi" role="tabpanel" aria-labelledby="tabBtnAi" class="hidden space-y-8">
+            <form id="aiTrainingForm" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-100 pb-4">
+                    <div>
+                        <h2 class="font-bold text-lg">AI Assistant Training &amp; Knowledge Base</h2>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            Live POS menu &amp; prices sync automatically. Add your restaurant's timings, delivery areas, deals &amp; custom FAQs here (saved safely without affecting your POS).
+                        </p>
+                    </div>
+                    <span id="aiLastUpdated" class="text-xs font-medium text-gray-500 shrink-0"></span>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label for="aiHoursField" class="block text-sm font-semibold text-gray-700 mb-1.5">Opening &amp; Delivery Hours</label>
+                        <input
+                            type="text"
+                            id="aiHoursField"
+                            maxlength="240"
+                            placeholder="e.g. Open daily 12:00 PM to 2:00 AM (Friday 2:00 PM – 2:00 AM)"
+                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="aiDeliveryField" class="block text-sm font-semibold text-gray-700 mb-1.5">Delivery Areas, Fees &amp; ETA</label>
+                        <textarea
+                            id="aiDeliveryField"
+                            rows="3"
+                            maxlength="400"
+                            placeholder="e.g. Free delivery above Rs. 1,500 in Cantt & DHA; Rs. 100–200 nearby. Typical ETA 35–45 mins."
+                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label for="aiFoodNotesField" class="block text-sm font-semibold text-gray-700 mb-1.5">Bestsellers, Spice &amp; Halal Notes</label>
+                        <textarea
+                            id="aiFoodNotesField"
+                            rows="3"
+                            maxlength="500"
+                            placeholder="e.g. 100% Zabiha Halal, fresh-cooked on order. Bestsellers: Zinger Burger, Chicken Karrahi Half, Malai Boti."
+                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                        ></textarea>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="aiDealsField" class="block text-sm font-semibold text-gray-700 mb-1.5">Current Deals &amp; Upsell Guidance</label>
+                        <textarea
+                            id="aiDealsField"
+                            rows="2"
+                            maxlength="500"
+                            placeholder="e.g. Suggest pairing a cold drink with burgers/BBQ; mention our 10-order 10% loyalty discount."
+                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                        ></textarea>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="aiInstructionsField" class="block text-sm font-semibold text-gray-700 mb-1.5">Brand Tone &amp; Extra Rules</label>
+                        <textarea
+                            id="aiInstructionsField"
+                            rows="3"
+                            maxlength="1000"
+                            placeholder="e.g. Greet with Assalam-o-Alaikum, stay warm in Roman Urdu or English, never promise custom discounts."
+                            class="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-orange-100"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- Custom Q&A Pairs -->
+                <div class="border-t border-gray-100 pt-4 space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div>
+                            <h3 class="font-bold text-sm text-gray-800">Custom Q&amp;A Pairs (Max 15)</h3>
+                            <p class="text-xs text-gray-500">Checked locally first for instant 0-quota answers and also taught to Gemini.</p>
+                        </div>
+                        <button
+                            type="button"
+                            id="addAiFaqBtn"
+                            class="px-3.5 py-2 rounded-xl bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-100 transition-colors"
+                        >
+                            + Add Q&amp;A
+                        </button>
+                    </div>
+
+                    <div id="aiFaqsList" class="space-y-3"></div>
+                </div>
+
+                <button
+                    type="submit"
+                    id="saveAiTrainingBtn"
+                    class="w-full bg-orange-500 text-white font-bold py-3 rounded-2xl hover:bg-orange-600 transition-colors disabled:opacity-50"
+                >
+                    Save AI Training
+                </button>
+
+                <p id="aiTrainingMessage" class="text-sm hidden"></p>
+            </form>
         </div>
 
     </div>

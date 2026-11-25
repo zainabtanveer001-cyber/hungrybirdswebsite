@@ -48,6 +48,7 @@ const ADMIN_EMAILS = [
 const MAX_BANNER_FILES = 5;
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_AI_FAQS = 15;
 
 const $ = (id) => document.getElementById(id);
 
@@ -138,12 +139,16 @@ function cleanupNewOrderListener() {
 }
 
 function clearAdminTables() {
-    ["customersTable", "ordersTable", "couponsTable", "bannersTable"].forEach(id => {
+    ["customersTable", "ordersTable", "couponsTable", "bannersTable", "aiFaqsList"].forEach(id => {
         const el = $(id);
         if (el) el.innerHTML = "";
     });
     if ($("customersSummary")) $("customersSummary").textContent = "";
     if ($("ordersSummary")) $("ordersSummary").textContent = "";
+    if ($("aiLastUpdated")) $("aiLastUpdated").textContent = "";
+    ["aiHoursField", "aiDeliveryField", "aiFoodNotesField", "aiDealsField", "aiInstructionsField"].forEach(id => {
+        if ($(id)) $(id).value = "";
+    });
 }
 
 function startNewOrderListener() {
@@ -201,7 +206,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     showScreen("adminPanel");
-    await Promise.all([loadCoupons(), loadCustomerData(), loadBanners()]);
+    await Promise.all([loadCoupons(), loadCustomerData(), loadBanners(), loadAiKnowledge()]);
     startNewOrderListener();
 });
 
@@ -250,7 +255,7 @@ $("adminForgotPasswordBtn")?.addEventListener("click", async () => {
 $("adminSignOutBtn")?.addEventListener("click", () => signOut(auth));
 $("deniedSignOutBtn")?.addEventListener("click", () => signOut(auth));
 $("refreshAdminDataBtn")?.addEventListener("click", () =>
-    Promise.all([loadCoupons(), loadCustomerData(), loadBanners()])
+    Promise.all([loadCoupons(), loadCustomerData(), loadBanners(), loadAiKnowledge()])
 );
 
 // ===== Customer and order listing =====
@@ -839,5 +844,175 @@ $("bannerForm")?.addEventListener("submit", async (event) => {
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = "Create Banner";
+    }
+});
+
+// ===== Admin Section Tabs =====
+const ADMIN_TAB_PANELS = {
+    orders: "adminTabOrders",
+    marketing: "adminTabMarketing",
+    ai: "adminTabAi"
+};
+
+function switchAdminTab(tabKey) {
+    const activeKey = ADMIN_TAB_PANELS[tabKey] ? tabKey : "orders";
+    document.querySelectorAll("[data-admin-tab]").forEach((btn) => {
+        const isActive = btn.dataset.adminTab === activeKey;
+        btn.setAttribute("aria-selected", String(isActive));
+        btn.classList.toggle("bg-gray-900", isActive);
+        btn.classList.toggle("text-white", isActive);
+        btn.classList.toggle("bg-white", !isActive);
+        btn.classList.toggle("text-gray-600", !isActive);
+        btn.classList.toggle("border", !isActive);
+        btn.classList.toggle("border-gray-200", !isActive);
+    });
+
+    Object.entries(ADMIN_TAB_PANELS).forEach(([key, panelId]) => {
+        $(panelId)?.classList.toggle("hidden", key !== activeKey);
+    });
+}
+
+document.querySelectorAll("[data-admin-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => switchAdminTab(btn.dataset.adminTab));
+});
+
+// ===== AI Assistant Training (/aiConfig/knowledge) =====
+function createAiFaqRow(faq = { question: "", answer: "" }) {
+    const row = document.createElement("div");
+    row.className = "ai-faq-row grid gap-2 sm:grid-cols-[1fr,1fr,auto] items-start border border-gray-100 rounded-2xl p-3 bg-gray-50/70";
+
+    const qInput = document.createElement("input");
+    qInput.type = "text";
+    qInput.maxLength = 160;
+    qInput.placeholder = "Customer question (e.g. Is parking available?)";
+    qInput.setAttribute("aria-label", "FAQ Question");
+    qInput.className = "ai-faq-question w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:ring-4 focus:ring-orange-100";
+    qInput.value = String(faq?.question ?? "");
+
+    const aInput = document.createElement("input");
+    aInput.type = "text";
+    aInput.maxLength = 350;
+    aInput.placeholder = "Exact answer AI should give";
+    aInput.setAttribute("aria-label", "FAQ Answer");
+    aInput.className = "ai-faq-answer w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm outline-none focus:ring-4 focus:ring-orange-100";
+    aInput.value = String(faq?.answer ?? "");
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "remove-ai-faq w-9 h-10 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors";
+    removeBtn.setAttribute("aria-label", "Remove Q&A");
+    removeBtn.innerHTML = '<i class="fa-solid fa-trash text-xs" aria-hidden="true"></i>';
+    removeBtn.addEventListener("click", () => row.remove());
+
+    row.appendChild(qInput);
+    row.appendChild(aInput);
+    row.appendChild(removeBtn);
+    return row;
+}
+
+function renderAiFaqRows(faqs = []) {
+    const list = $("aiFaqsList");
+    if (!list) return;
+    list.innerHTML = "";
+    const items = Array.isArray(faqs) ? faqs.slice(0, MAX_AI_FAQS) : [];
+    items.forEach((faq) => list.appendChild(createAiFaqRow(faq)));
+}
+
+$("addAiFaqBtn")?.addEventListener("click", () => {
+    const list = $("aiFaqsList");
+    if (!list) return;
+    hideFormMessage("aiTrainingMessage");
+    if (list.querySelectorAll(".ai-faq-row").length >= MAX_AI_FAQS) {
+        setFormMessage("aiTrainingMessage", `Maximum ${MAX_AI_FAQS} custom Q&A pairs reached.`);
+        return;
+    }
+    const row = createAiFaqRow();
+    list.appendChild(row);
+    row.querySelector(".ai-faq-question")?.focus();
+});
+
+async function loadAiKnowledge() {
+    const form = $("aiTrainingForm");
+    if (!form) return;
+
+    try {
+        const snap = await getDoc(doc(db, "aiConfig", "knowledge"));
+        if (!snap.exists()) {
+            if ($("aiLastUpdated")) $("aiLastUpdated").textContent = "Not configured yet";
+            renderAiFaqRows([]);
+            return;
+        }
+
+        const data = snap.data() || {};
+        if ($("aiHoursField")) $("aiHoursField").value = String(data.openingHours || "");
+        if ($("aiDeliveryField")) $("aiDeliveryField").value = String(data.deliveryInfo || "");
+        if ($("aiFoodNotesField")) $("aiFoodNotesField").value = String(data.foodNotes || "");
+        if ($("aiDealsField")) $("aiDealsField").value = String(data.dealsAndUpsells || "");
+        if ($("aiInstructionsField")) $("aiInstructionsField").value = String(data.customInstructions || "");
+        renderAiFaqRows(data.faqs);
+
+        if ($("aiLastUpdated")) {
+            $("aiLastUpdated").textContent = data.updatedAt
+                ? `Last saved ${formatDate(data.updatedAt)}`
+                : "Saved";
+        }
+    } catch (error) {
+        console.error("Failed to load AI training knowledge:", error);
+        if (error?.code === "permission-denied") {
+            setFormMessage(
+                "aiTrainingMessage",
+                "Firestore /aiConfig rule not published yet. Publish the updated firestore.rules to Firebase Console first."
+            );
+        }
+    }
+}
+
+$("aiTrainingForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const saveBtn = $("saveAiTrainingBtn");
+    hideFormMessage("aiTrainingMessage");
+
+    const faqs = Array.from(document.querySelectorAll("#aiFaqsList .ai-faq-row"))
+        .slice(0, MAX_AI_FAQS)
+        .map((row) => ({
+            question: row.querySelector(".ai-faq-question")?.value.trim().slice(0, 160) || "",
+            answer: row.querySelector(".ai-faq-answer")?.value.trim().slice(0, 350) || ""
+        }))
+        .filter((item) => item.question && item.answer);
+
+    const payload = {
+        openingHours: ($("aiHoursField")?.value || "").trim().slice(0, 240),
+        deliveryInfo: ($("aiDeliveryField")?.value || "").trim().slice(0, 400),
+        foodNotes: ($("aiFoodNotesField")?.value || "").trim().slice(0, 500),
+        dealsAndUpsells: ($("aiDealsField")?.value || "").trim().slice(0, 500),
+        customInstructions: ($("aiInstructionsField")?.value || "").trim().slice(0, 1000),
+        faqs,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.email || ""
+    };
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...`;
+    }
+
+    try {
+        await setDoc(doc(db, "aiConfig", "knowledge"), payload);
+        if ($("aiLastUpdated")) $("aiLastUpdated").textContent = `Last saved ${formatDate(new Date())}`;
+        renderAiFaqRows(faqs);
+        setFormMessage("aiTrainingMessage", "AI training saved! Live customers will receive these updates immediately.", false);
+    } catch (error) {
+        console.error("Failed to save AI training knowledge:", error);
+        setFormMessage(
+            "aiTrainingMessage",
+            error?.code === "permission-denied"
+                ? "Permission denied: publish the /aiConfig rule from firestore.rules to Firebase Console first."
+                : "Could not save AI training. Please try again."
+        );
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save AI Training";
+        }
     }
 });

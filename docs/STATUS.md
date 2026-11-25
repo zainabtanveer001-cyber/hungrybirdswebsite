@@ -1,9 +1,9 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Deployed Live — Gemini AI Proxy Routing, Evergreen Model Aliases & Diversified Fallback Applied
-- **Last Updated:** 2026-11-25
-- **Branch:** `main` (ready for push to `origin/main`)
-- **Automated Regression (`npm test`):** **PASS (`43/43` tests green)**
+- **Current Phase:** Admin AI Training Tab Built & Verified (Publish `/aiConfig` Rule in Firebase Console to Save Live)
+- **Last Updated:** 2026-11-26
+- **Branch:** `main` (pushed to `origin/main`)
+- **Automated Regression (`npm test`):** **PASS (`45/45` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
 - **CSS Build (`npm run build:css`):** **PASS (`styles.css` compiled cleanly)**
 
@@ -39,6 +39,7 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-26 (Admin AI Training Tab & `/aiConfig/knowledge`):** Added tabbed Admin layout in [admin.html](../admin.html) (`Customers & Orders`, `Coupons & Banners`, `AI Training`), `/aiConfig/{docId}` rules in [firestore.rules](../firestore.rules), admin CRUD in [adminwebsite.js](../adminwebsite.js), storefront `/aiConfig/knowledge` loading in [appwebsite.js](../appwebsite.js), owner-FAQ/knowledge grounding in [ai-assistant.js](../ai-assistant.js) and [api/_lib/gemini-assistant.js](../api/_lib/gemini-assistant.js), bumped SW to `hungrybirds-cache-v9`, and added `TC-050`–`TC-051` (`45/45` tests passing).
 - **2026-11-25 (Vercel `/api/chat` Routing, Evergreen Gemini Aliases & Diversified Fallback):** Removed conflicting `"outputDirectory": "."` from [vercel.json](../vercel.json) so `/api/chat.js` executes cleanly as a Vercel Serverless Function, updated `DEFAULT_MODEL_CHAIN` to `gemini-flash-lite-latest` / `gemini-flash-latest` with `maxOutputTokens: 1024` and plain-text recovery, prevented unmatched fallback queries from repeating the same 3 cheapest items (added greeting, menu overview, price lookup, and family-meal matching in `ai-assistant.js`), and bumped Service Worker to `hungrybirds-cache-v8`.
 - **2026-11-25 (Phases 3–6 — Gemini AI Build, Live QA, Security Audit & Runbook):** Built Milestone 0 (`afecf40` `/api/chat`), Milestone 1 (`6a17e79` `ai-assistant.js` + `sw.js` `v7`), and Milestone 2 (`2d924c3` bottom-left chat drawer + `appwebsite.js` wiring); verified `43/43` unit tests, `0` npm audit vulnerabilities, and live desktop (`1280×800`) + mobile (`375×812`) browser QA; documented free Google AI Studio + Vercel setup in [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md). Stopped before `git push origin main` for owner deploy approval.
 - **2026-11-25 (Phase 2 Design — Gemini AI Assistant):** Phase 1 approved; produced [docs/DESIGN.md](./DESIGN.md) covering flows, WCAG 2.2 AA tokens, bottom-left launcher placement, and drawer states.

@@ -561,9 +561,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v8 caches before module boot, sw.js v8 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v9 caches before module boot, sw.js v9 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v8'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v9'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -572,7 +572,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v8 caches before module boo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v8'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v9'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -987,6 +987,7 @@ test('US-AI-1 | TC-048: AI chat launcher sits bottom-left clear of right CTA/car
   assert.equal(/id="aiChatInput"[\s\S]{0,120}maxlength="500"/.test(indexHtml), true);
   assert.equal(aiJs.includes('onclick='), false, 'ai-assistant.js must use data-* delegation instead of inline onclick');
   assert.equal(aiJs.includes('escapeAiHtml('), true);
+  assert.equal(/function\s+pushAssistantResult\s*\([\s\S]*text:\s*String\(result\?\.reply\s*\|\|\s*result\?\.text/.test(aiJs), true, 'Fallback/Gemini replies must map .reply to .text');
 });
 
 test('US-AI-3 / US-AI-5 | TC-049: appwebsite.js wires initAiAssistant cleanly with live getters/actions and zero secrets anywhere', () => {
@@ -998,4 +999,72 @@ test('US-AI-3 / US-AI-5 | TC-049: appwebsite.js wires initAiAssistant cleanly wi
     assert.equal(fileText.includes('GEMINI_API_KEY'), false, 'Client code must never reference GEMINI_API_KEY');
     assert.equal(/AIza[0-9A-Za-z\-_]{30,}/.test(fileText), false, 'No API key literal allowed in client/static files except firebase-config');
   }
+});
+
+test('US-AI-8 | TC-050: firestore.rules permits /aiConfig public reads & admin-only writes, admin.html adds AI Training tab, and appwebsite.js passes live knowledge', () => {
+  assert.equal(/match\s+\/aiConfig\/\{docId\}\s*\{[\s\S]*?allow\s+read:\s*if\s+true;[\s\S]*?allow\s+write:\s*if\s+isAdmin\(\);/.test(rulesText), true);
+  assert.equal(adminHtml.includes('data-admin-tab="ai"'), true);
+  assert.equal(adminHtml.includes('id="aiTrainingForm"'), true);
+  assert.equal(adminHtml.includes('id="aiFaqsList"'), true);
+  assert.equal(adminJs.includes('doc(db, "aiConfig", "knowledge")'), true);
+  assert.equal(/clearAdminTables[\s\S]*aiFaqsList/.test(adminJs), true);
+  assert.equal(appJs.includes('loadAiKnowledge'), true);
+  assert.equal(appJs.includes('getAiKnowledge: () => aiKnowledge'), true);
+});
+
+test('US-AI-8 | TC-051: Admin AI knowledge propagates safely to local FAQ answers and Gemini server systemInstruction without leaking PII', async () => {
+  const { sanitizeAiKnowledge, buildSanitizedAiPayload, tryLocalFaqAnswer } = loadAiLogic();
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { validateAndSanitizeInput, buildGeminiRequestBody } = require('../api/_lib/gemini-assistant.js');
+
+  const rawKnowledge = {
+    openingHours: 'Open daily 12:00 PM to 2:00 AM',
+    deliveryInfo: 'Free delivery over Rs. 1,500 in Cantt & DHA.',
+    foodNotes: '100% Zabiha Halal. Top sellers: Zinger Burger & Chicken Karrahi.',
+    dealsAndUpsells: 'Pair any Karrahi with Pepsi 1 litre!',
+    customInstructions: 'Always greet warmly and mention fresh cooking.',
+    faqs: [
+      { question: 'Is family dining seating available?', answer: 'Yes, we have a comfortable family hall upstairs.' },
+    ],
+    extraSecret: 'must_be_stripped',
+  };
+
+  const clean = sanitizeAiKnowledge(rawKnowledge);
+  assert.equal(clean.extraSecret, undefined);
+  assert.equal(clean.openingHours, 'Open daily 12:00 PM to 2:00 AM');
+  assert.equal(clean.faqs.length, 1);
+
+  assert.equal(
+    tryLocalFaqAnswer('Do you have family dining seating?', { knowledge: rawKnowledge })?.reply,
+    'Yes, we have a comfortable family hall upstairs.'
+  );
+  assert.equal(
+    tryLocalFaqAnswer('What are your opening hours?', { knowledge: rawKnowledge })?.reply,
+    'Open daily 12:00 PM to 2:00 AM'
+  );
+  assert.equal(
+    tryLocalFaqAnswer('What are delivery charges in DHA?', { knowledge: rawKnowledge })?.reply.includes('Free delivery over Rs. 1,500'),
+    true
+  );
+  assert.equal(
+    tryLocalFaqAnswer('Is food Zabiha Halal and what are your bestsellers?', { knowledge: rawKnowledge })?.reply.includes('100% Zabiha Halal'),
+    true
+  );
+
+  const clientPayload = buildSanitizedAiPayload({
+    message: 'What do you recommend?',
+    menuItems: [{ id: 'm1', name: 'Zinger Burger', price: 450, categoryId: 'c1' }],
+    categories: [{ id: 'c1', name: 'Fast Food' }],
+    knowledge: rawKnowledge,
+  });
+  const serverSanitized = validateAndSanitizeInput(clientPayload);
+  assert.equal(serverSanitized.ok, true);
+  assert.equal(serverSanitized.value.knowledge.extraSecret, undefined);
+
+  const geminiReq = buildGeminiRequestBody(serverSanitized.value);
+  const sysText = geminiReq.systemInstruction.parts[0].text;
+  assert.equal(sysText.includes('Open daily 12:00 PM to 2:00 AM'), true);
+  assert.equal(sysText.includes('Always greet warmly'), true);
+  assert.equal(sysText.includes('comfortable family hall'), true);
 });

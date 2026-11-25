@@ -6,7 +6,7 @@ const DEFAULT_MODEL_CHAIN = [
 ];
 
 const ALLOWED_ACTIONS = new Set(['TRACK_ORDER', 'OPEN_CART', 'WHATSAPP']);
-const MAX_BODY_BYTES = 32 * 1024;
+const MAX_BODY_BYTES = 48 * 1024;
 const MAX_MESSAGE_CHARS = 500;
 const MAX_HISTORY_TURNS = 6;
 const MAX_MENU_ITEMS = 150;
@@ -95,6 +95,33 @@ function containsDataImage(str) {
   return typeof str === 'string' && /data:image\//i.test(str);
 }
 
+function sanitizeKnowledge(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const clip = (val, max) => {
+    const s = typeof val === 'string' ? val.trim().slice(0, max) : '';
+    return containsDataImage(s) ? '' : s;
+  };
+  const openingHours = clip(raw.openingHours, 240);
+  const deliveryInfo = clip(raw.deliveryInfo, 400);
+  const foodNotes = clip(raw.foodNotes, 500);
+  const dealsAndUpsells = clip(raw.dealsAndUpsells, 500);
+  const customInstructions = clip(raw.customInstructions, 1000);
+  const faqs = Array.isArray(raw.faqs)
+    ? raw.faqs
+        .slice(0, 15)
+        .map((f) => ({
+          question: clip(f?.question, 160),
+          answer: clip(f?.answer, 350),
+        }))
+        .filter((f) => f.question && f.answer)
+    : [];
+
+  if (!openingHours && !deliveryInfo && !foodNotes && !dealsAndUpsells && !customInstructions && !faqs.length) {
+    return null;
+  }
+  return { openingHours, deliveryInfo, foodNotes, dealsAndUpsells, customInstructions, faqs };
+}
+
 function validateAndSanitizeInput(rawBody) {
   if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
     return { ok: false, error: 'Request body must be a JSON object.' };
@@ -167,15 +194,22 @@ function validateAndSanitizeInput(rawBody) {
       ? rawSubtotal
       : cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
 
+  const knowledge = sanitizeKnowledge(rawBody.knowledge);
+
+  const value = {
+    message,
+    history,
+    menu,
+    cart: { items: cartItems, subtotal },
+    orderType,
+  };
+  if (knowledge) {
+    value.knowledge = knowledge;
+  }
+
   return {
     ok: true,
-    value: {
-      message,
-      history,
-      menu,
-      cart: { items: cartItems, subtotal },
-      orderType,
-    },
+    value,
   };
 }
 
@@ -194,17 +228,37 @@ function buildGeminiRequestBody(sanitized) {
     ? sanitized.cart.items.map((item) => `${item.name} x${item.qty} (Rs. ${item.price * item.qty})`).join(', ')
     : 'Empty';
 
+  const knowledgeParts = [];
+  if (sanitized.knowledge) {
+    const k = sanitized.knowledge;
+    if (k.openingHours) knowledgeParts.push(`Opening Hours: ${k.openingHours}`);
+    if (k.deliveryInfo) knowledgeParts.push(`Delivery Areas & Fees: ${k.deliveryInfo}`);
+    if (k.foodNotes) knowledgeParts.push(`Bestsellers, Spice & Halal Notes: ${k.foodNotes}`);
+    if (k.dealsAndUpsells) knowledgeParts.push(`Deals & Upsell Guidance: ${k.dealsAndUpsells}`);
+    if (k.customInstructions) knowledgeParts.push(`Owner Instructions: ${k.customInstructions}`);
+    if (k.faqs?.length) {
+      knowledgeParts.push(
+        `Custom Owner Q&As: ${k.faqs.map((f) => `Q: ${f.question} -> A: ${f.answer}`).join(' | ')}`
+      );
+    }
+  }
+
   const systemText = [
     'You are the Hungry Birds Restaurant online ordering assistant.',
     'Stay strictly focused on Hungry Birds food, menu recommendations, budget planning, cart help, delivery/takeaway basics, and order tracking.',
     'Politely decline unrelated off-topic questions and offer to help with the Hungry Birds menu.',
     'Reply concisely (2-4 short sentences) and naturally in the same language/script as the customer (English, Roman Urdu, or Urdu script).',
-    'Verified store facts only: Minimum delivery order is Rs. 500; delivery fee varies by area and is confirmed by staff; every 10 completed online orders earns a 10% off loyalty coupon; WhatsApp/Call support is 0325-7867774; customer can track orders via the Track Order button.',
-    'Do NOT guess opening hours, exact neighborhood delivery charges, allergen/ingredient guarantees, or unresolved complaints. Say plainly you do not have that exact detail and include "WHATSAPP" in actions.',
+    'Verified store facts: Minimum delivery order is Rs. 500; every 10 completed online orders earns a 10% off loyalty coupon; WhatsApp/Call support is 0325-7867774; customer can track orders via the Track Order button.',
+    knowledgeParts.length
+      ? `RESTAURANT OWNER KNOWLEDGE BASE (authoritative): ${knowledgeParts.join(' ; ')}`
+      : 'Do NOT guess opening hours, exact neighborhood delivery charges, allergen/ingredient guarantees, or unresolved complaints. Say plainly you do not have that exact detail and include "WHATSAPP" in actions.',
+    knowledgeParts.length
+      ? 'For any detail NOT covered in the menu or owner knowledge base (like unresolved complaints or missing info), do not guess — direct the customer to WhatsApp 0325-7867774 with "WHATSAPP" in actions.'
+      : '',
     'ONLY recommend items from the provided MENU list using exact item IDs in recommendedItemIds (max 3). Never invent prices or items.',
     'Allowed actions values: "TRACK_ORDER", "OPEN_CART", "WHATSAPP".',
     'Respond ONLY with JSON containing keys: reply (string), recommendedItemIds (string[]), actions (string[]).',
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 
   const contents = sanitized.history.map((turn) => ({
     role: turn.role,

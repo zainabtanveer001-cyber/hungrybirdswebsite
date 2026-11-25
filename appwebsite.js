@@ -64,6 +64,7 @@ let activeOrderListener = null;
 
 let categories = [{ id: "ALL", name: "All" }];
 let menuItems = [];
+let aiKnowledge = null;
 
 const modalCloseTimers = new WeakMap();
 const modalPreviousFocus = new WeakMap();
@@ -3157,16 +3158,29 @@ function getProgressPercentage(currentStatus, orderType) {
     return ((currentIndex + 1) / steps.length) * 100;
 }
 
+async function loadAiKnowledge() {
+    try {
+        const snap = await getDoc(doc(db, "aiConfig", "knowledge"));
+        if (snap.exists()) {
+            aiKnowledge = snap.data() || null;
+        }
+    } catch {
+        // Ignore permission-denied or offline errors; built-in assistant defaults remain active
+    }
+}
+
 // Start AI assistant & website menu
 initAiAssistant({
     getMenuItems: () => menuItems,
     getCategories: () => categories,
     getCart: () => cart,
     getOrderType: () => currentOrderType,
+    getAiKnowledge: () => aiKnowledge,
     addToCart,
     openTrackOrder: openTrackOrderFlow,
     openCart: openCartFlow,
     showToast
 });
 
+loadAiKnowledge();
 initMenu();

@@ -83,6 +83,12 @@ service cloud.firestore {
             allow write: if isAdmin();
         }
 
+        // AI Assistant training & restaurant knowledge base; publicly readable, admin-only writes.
+        match /aiConfig/{docId} {
+            allow read: if true;
+            allow write: if isAdmin();
+        }
+
         // Customer orders contain PII and are strictly scoped to owner or staff.
         // Guest order status tracking reads the sanitized /orderTracking/{orderId} projection.
         match /onlineOrders/{orderId} {
