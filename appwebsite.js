@@ -2453,15 +2453,16 @@ async function loadBanners() {
         const snapshot = await getDocs(
             query(
                 collection(db, "banners"),
-                where("active", "==", true),
-                orderBy("order", "asc")
+                where("active", "==", true)
             )
         );
 
-        bannerData = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data()
-        }));
+        bannerData = snapshot.docs
+            .map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            }))
+            .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
         renderBannerCarousel();
     } catch (error) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hungrybirds-cache-v3';
+const CACHE_NAME = 'hungrybirds-cache-v4';
 const ASSETS = [
   '/',
   '/index.html',
@@ -28,11 +28,19 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // Let browser handle Firebase SDK scripts, Firestore/Auth APIs, and Analytics directly
   if (
+    url.hostname === 'www.gstatic.com' ||
+    url.hostname.includes('firebaseio') ||
+    url.hostname.includes('firebaseapp') ||
+    url.hostname.includes('firebasestorage.app') ||
     url.hostname.includes('firestore') ||
     url.hostname.includes('identitytoolkit') ||
     url.hostname.includes('securetoken') ||
-    url.hostname.includes('google-analytics')
+    url.hostname.includes('google-analytics') ||
+    (url.hostname.includes('googleapis.com') && !url.hostname.includes('firebasestorage'))
   ) {
     return;
   }
@@ -61,7 +69,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // External CDN / Firebase Storage assets: cache-first with network population
+  // External CDN / Firebase Storage images: cache-first with network population
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
