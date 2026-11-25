@@ -1,12 +1,12 @@
 // ===== Self-Healing Service Worker Bootstrap =====
 // Loaded as a classic same-origin script before appwebsite.js so browsers stuck on
-// legacy pre-v7 Service Workers/caches automatically purge stale cached bundles
+// legacy pre-v8 Service Workers/caches automatically purge stale cached bundles
 // and recover.
 (function bootstrapServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
 
-    const CURRENT_CACHE = "hungrybirds-cache-v7";
-    const MIGRATION_FLAG = "hb_sw_migrated_v7";
+    const CURRENT_CACHE = "hungrybirds-cache-v8";
+    const MIGRATION_FLAG = "hb_sw_migrated_v8";
 
     async function recoverOrRegister() {
         try {

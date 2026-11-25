@@ -99,12 +99,69 @@ function looksLikeFoodRecommendationRequest(text) {
     return /\b(suggest|recommend|meal|menu|budget|under|within|mein|tak|rs\.?|pkr|burger|zinger|karrahi|karahi|sajji|bbq|tikka|drink|pepsi|eat|khana|khao|hungry|best|cheap|sasta|combo|deal|for\s+\d+|logon)\b/i.test(text);
 }
 
-export function tryLocalFaqAnswer(rawMessage, { cart = [], orderType = "DELIVERY" } = {}) {
+function summarizeMenuCategories(categories = [], menuItems = []) {
+    const names = [];
+    for (const cat of categories || []) {
+        const id = String(cat?.id || "");
+        const name = String(cat?.name || "").trim();
+        if (name && id !== "ALL" && !names.includes(name)) {
+            names.push(name);
+        }
+    }
+    if (!names.length && Array.isArray(menuItems)) {
+        for (const item of menuItems) {
+            const cat = String(item?.categoryId || item?.category || "").trim();
+            if (cat && cat !== "uncategorized" && !names.includes(cat)) {
+                names.push(cat);
+            }
+        }
+    }
+    return names;
+}
+
+export function tryLocalFaqAnswer(
+    rawMessage,
+    { cart = [], orderType = "DELIVERY", categories = [], menuItems = [] } = {}
+) {
     const text = String(rawMessage ?? "").trim();
     if (!text) return null;
 
     const lower = text.toLowerCase();
     const isFoodQuery = looksLikeFoodRecommendationRequest(lower);
+    const wordCount = lower.split(/\s+/).filter(Boolean).length;
+    const categoryNames = summarizeMenuCategories(categories, menuItems);
+    const categoryListText = categoryNames.length ? categoryNames.join(", ") : "Burgers, Karrahi, BBQ & Cold Drinks";
+
+    if (
+        wordCount <= 4 &&
+        /\b(hi|hello|hey|salam|assalam|aoa|slm|hola)\b/i.test(lower) &&
+        !isFoodQuery
+    ) {
+        return {
+            reply: `Assalam-o-Alaikum! Welcome to Hungry Birds. Ask me about ${categoryListText}, share your budget (e.g. "under Rs. 1,000"), or ask to track an order!`,
+            recommendedItemIds: [],
+            actions: [],
+            source: "local"
+        };
+    }
+
+    if (
+        /\b(what do you have|show menu|full menu|menu list|all categories|categories|kya kya hai|kya milta|dishes available)\b/i.test(lower) &&
+        !extractBudgetAmount(text)
+    ) {
+        const validPrices = (Array.isArray(menuItems) ? menuItems : [])
+            .map((i) => Number(i?.price))
+            .filter((p) => Number.isFinite(p) && p > 0);
+        const minPriceText = validPrices.length
+            ? ` starting from Rs. ${Math.min(...validPrices).toLocaleString()}`
+            : "";
+        return {
+            reply: `Our live menu covers ${categoryListText}${minPriceText}. Tell me which category or budget you prefer (e.g., "Best burgers" or "1500 mein 2 logon ka dinner") and I'll pick dishes you can add in one tap!`,
+            recommendedItemIds: [],
+            actions: [],
+            source: "local"
+        };
+    }
 
     if (
         /\b(track|order status|where is my order|mera order|order kahan)\b/i.test(lower) &&
@@ -241,6 +298,8 @@ export function buildLocalMenuFallback(
     }
 
     const budget = extractBudgetAmount(text);
+    const isPriceLookup = /\b(price of|how much|cost of|kitne ka|kitne ki|rate of|price)\b/i.test(lower);
+    const isGroupMeal = /\b(family|friends|sharing|group|dinner|lunch|people|logon|log)\b/i.test(lower);
     const words = lower.split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
     const expandedTokens = new Set(words);
     for (const w of words) {
@@ -251,9 +310,13 @@ export function buildLocalMenuFallback(
 
     const scored = catalog.map((item) => {
         const haystack = `${item.name} ${item.categoryName}`.toLowerCase();
-        let score = 0;
+        let matchScore = 0;
         for (const tok of expandedTokens) {
-            if (haystack.includes(tok)) score += 3;
+            if (haystack.includes(tok)) matchScore += 3;
+        }
+        let score = matchScore;
+        if (isGroupMeal && (item.price >= 600 || /\b(karrahi|karahi|sajji|full|half|family|platter)\b/i.test(haystack))) {
+            score += 3;
         }
         if (/cold drink/i.test(item.categoryName) && !/\b(drink|pepsi|7up|dew|coke|cold|beverage)\b/i.test(lower)) {
             score -= 1;
@@ -262,16 +325,31 @@ export function buildLocalMenuFallback(
             if (item.price <= budget) score += 2;
             else score -= 5;
         }
-        return { item, score };
+        return { item, score, matchScore };
     });
+
+    const maxMatchScore = scored.reduce((max, entry) => Math.max(max, entry.matchScore), 0);
+
+    if (budget === null && maxMatchScore === 0 && !isGroupMeal) {
+        const categoryNames = summarizeMenuCategories(categories, menuItems);
+        const categoryText = categoryNames.length ? categoryNames.join(", ") : "Fast Food, Karrahi, BBQ & Cold Drinks";
+        return {
+            reply: `I can help you browse ${categoryText}, plan combos by budget (e.g., "Meal under Rs. 1,000"), check Delivery minimums (Rs. 500), or open Order Tracking. What are you craving today?`,
+            recommendedItemIds: [],
+            actions: ["WHATSAPP"],
+            source: "fallback"
+        };
+    }
 
     scored.sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
-        return a.item.price - b.item.price;
+        return isGroupMeal ? b.item.price - a.item.price : a.item.price - b.item.price;
     });
 
     let picks = [];
-    if (budget !== null) {
+    if (isPriceLookup && maxMatchScore > 0) {
+        picks = scored.filter((entry) => entry.matchScore > 0).slice(0, 3).map((entry) => entry.item);
+    } else if (budget !== null) {
         const withinBudget = scored.filter((entry) => entry.item.price <= budget);
         let running = 0;
         for (const entry of withinBudget) {
@@ -299,10 +377,14 @@ export function buildLocalMenuFallback(
         const cheapest = [...catalog].sort((a, b) => a.price - b.price)[0];
         picks = [cheapest];
         reply = `Our most affordable option right now is ${cheapest.name} at Rs. ${cheapest.price.toLocaleString()}.`;
+    } else if (isPriceLookup && maxMatchScore > 0) {
+        reply = `Current menu pricing: ${pickSummary}. You can add directly below!`;
     } else if (budget !== null) {
         reply = `Within Rs. ${budget.toLocaleString()}, here are great picks totaling Rs. ${pickTotal.toLocaleString()}: ${pickSummary}.`;
+    } else if (isGroupMeal) {
+        reply = `Great sharing options for dining together (totaling Rs. ${pickTotal.toLocaleString()}): ${pickSummary}.`;
     } else {
-        reply = `Here are popular Hungry Birds picks you can add right away: ${pickSummary}.`;
+        reply = `Here are matching Hungry Birds picks you can add right away: ${pickSummary}.`;
     }
 
     if (orderType === "DELIVERY" && subtotal + pickTotal < DELIVERY_MINIMUM_RS) {
@@ -553,7 +635,7 @@ export function initAiAssistant({
         history.push({ role: "user", text: message });
         input.value = "";
 
-        const faqHit = tryLocalFaqAnswer(message, { cart, orderType });
+        const faqHit = tryLocalFaqAnswer(message, { cart, orderType, categories, menuItems });
         if (faqHit) {
             history.push({
                 role: "assistant",
@@ -611,10 +693,13 @@ export function initAiAssistant({
                 return;
             }
 
+            const errData = await response.json().catch(() => null);
+            console.warn("[Hungry Birds AI] /api/chat fallback:", response.status, errData?.error || "UNKNOWN");
             const fallback = buildLocalMenuFallback(message, menuItems, categories, cart, orderType);
             history.push({ role: "assistant", ...fallback });
             setStatusLabel("Menu helper");
-        } catch {
+        } catch (err) {
+            console.warn("[Hungry Birds AI] /api/chat request failed:", err?.name || "Error");
             const fallback = buildLocalMenuFallback(message, menuItems, categories, cart, orderType);
             history.push({ role: "assistant", ...fallback });
             setStatusLabel("Menu helper");

@@ -1,7 +1,7 @@
 const DEFAULT_MODEL_CHAIN = [
-  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-flash-latest',
   'gemini-2.5-flash-lite',
-  'gemini-3.5-flash',
   'gemini-2.5-flash',
 ];
 
@@ -230,7 +230,7 @@ function buildGeminiRequestBody(sanitized) {
     contents,
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 350,
+      maxOutputTokens: 1024,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
@@ -263,11 +263,19 @@ function parseAndValidateModelOutput(rawGeminiJson, validMenuIds) {
     return { ok: false, error: 'Empty Gemini candidate response.' };
   }
 
+  const stripped = stripJsonCodeFence(candidateText);
   let parsed;
   try {
-    parsed = JSON.parse(stripJsonCodeFence(candidateText));
+    parsed = JSON.parse(stripped);
   } catch {
-    return { ok: false, error: 'Malformed JSON from Gemini.' };
+    return {
+      ok: true,
+      data: {
+        reply: stripped.slice(0, 1200),
+        recommendedItemIds: [],
+        actions: [],
+      },
+    };
   }
 
   if (!parsed || typeof parsed !== 'object' || typeof parsed.reply !== 'string') {

@@ -561,9 +561,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v7 caches before module boot, sw.js v7 skips cross-origin & /api/ requests, and vercel.json uses literal no-cache routes', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v8 caches before module boot, sw.js v8 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v7'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v8'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -572,10 +572,12 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v7 caches before module boo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v7'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v8'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
+
+  assert.equal(vercelJson.outputDirectory, undefined, 'vercel.json must not set outputDirectory "." alongside /api serverless functions');
 
   const headerSources = (vercelJson.headers || []).map((h) => h.source);
   assert.equal(headerSources.some((s) => s.includes('(sw|sw-register)')), false, 'vercel.json should use literal SW route paths rather than regex alternation');
@@ -812,9 +814,19 @@ test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key hea
 
   assert.equal(okRes.statusCode, 200);
   assert.equal(okRes.body.source, 'gemini');
-  assert.equal(okRes.body.model, 'gemini-3.5-flash-lite');
+  assert.equal(okRes.body.model, 'gemini-flash-lite-latest');
   assert.deepEqual(okRes.body.recommendedItemIds, ['item_1']);
   assert.deepEqual(okRes.body.actions, ['OPEN_CART']);
+  const sentBody = JSON.parse(fetchCalls[0].init.body);
+  assert.ok(sentBody.generationConfig.maxOutputTokens >= 1024);
+
+  const { parseAndValidateModelOutput } = require('../api/_lib/gemini-assistant.js');
+  const plainRecovery = parseAndValidateModelOutput(
+    { candidates: [{ content: { parts: [{ text: 'Try our Zinger Burger for Rs. 450!' }] } }] },
+    new Set(['item_1'])
+  );
+  assert.equal(plainRecovery.ok, true);
+  assert.equal(plainRecovery.data.reply, 'Try our Zinger Burger for Rs. 450!');
   assert.equal(fetchCalls.length, 2);
   assert.equal(fetchCalls[0].url.includes('custom-flash-model'), true);
   assert.equal(fetchCalls[0].url.includes('test-secret-key'), false, 'API key must NOT appear in URL');
@@ -881,6 +893,21 @@ test('US-AI-2 / US-AI-4 / US-AI-6 | TC-046: Zero-quota local FAQ router answers 
   assert.equal(tryLocalFaqAnswer('bhai 1000 mein 2 burgers suggest karo', {}), null);
   assert.equal(tryLocalFaqAnswer('Best burgers?', {}), null);
   assert.equal(escapeAiHtml('<img src=x onerror="alert(1)">'), '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+
+  const greet = tryLocalFaqAnswer('Hi', {
+    categories: [{ id: 'ALL', name: 'All' }, { id: 'c1', name: 'Fast Food' }, { id: 'c2', name: 'Karrahi' }],
+  });
+  assert.equal(greet?.source, 'local');
+  assert.equal(greet?.reply.includes('Fast Food, Karrahi'), true);
+  assert.deepEqual(Array.from(greet?.recommendedItemIds || []), []);
+
+  const menuOverview = tryLocalFaqAnswer('What do you have on the menu?', {
+    categories: [{ id: 'ALL', name: 'All' }, { id: 'c1', name: 'Fast Food' }, { id: 'c2', name: 'Karrahi' }],
+    menuItems: [{ price: 150 }, { price: 1100 }],
+  });
+  assert.equal(menuOverview?.source, 'local');
+  assert.equal(menuOverview?.reply.includes('Rs. 150'), true);
+  assert.equal(menuOverview?.reply.includes('Fast Food, Karrahi'), true);
 });
 
 test('US-AI-2 / US-AI-6 / US-AI-7 | TC-047: Client AI sanitizer drops all PII/images and local fallback matches real items by budget/keyword in English & Roman Urdu', () => {
@@ -921,6 +948,17 @@ test('US-AI-2 / US-AI-6 / US-AI-7 | TC-047: Client AI sanitizer drops all PII/im
   const tinyBudget = buildLocalMenuFallback('Meal under Rs 100', sampleMenu, sampleCategories, [], 'DELIVERY');
   assert.deepEqual(Array.from(tinyBudget.recommendedItemIds), ['m3']);
   assert.equal(tinyBudget.reply.includes('150'), true);
+
+  const priceLookup = buildLocalMenuFallback('How much is Zinger Burger?', sampleMenu, sampleCategories, [], 'DELIVERY');
+  assert.deepEqual(Array.from(priceLookup.recommendedItemIds), ['m1']);
+  assert.equal(priceLookup.reply.includes('450'), true);
+
+  const groupDinner = buildLocalMenuFallback('Dinner for family sharing', sampleMenu, sampleCategories, [], 'DELIVERY');
+  assert.equal(groupDinner.recommendedItemIds.includes('m2'), true, 'Family dinner should highlight Karrahi main');
+
+  const unmatched = buildLocalMenuFallback('Tell me something random', sampleMenu, sampleCategories, [], 'DELIVERY');
+  assert.deepEqual(Array.from(unmatched.recommendedItemIds), []);
+  assert.equal(unmatched.reply.includes('Fast Food, Karrahi, Cold Drinks'), true);
 });
 
 test('US-AI-1 | TC-048: AI chat launcher sits bottom-left clear of right CTA/cart and drawer meets WCAG dialog ARIA + starter chips', () => {
