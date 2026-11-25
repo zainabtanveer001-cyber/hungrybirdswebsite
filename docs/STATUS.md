@@ -1,6 +1,6 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Post-Deploy Hardening & Live Connectivity Recovery Complete
+- **Current Phase:** Phase 2 UI/UX Design Complete -> Executing Phase 3 Build (Gemini AI Customer Assistant)
 - **Last Updated:** 2026-11-25
 - **Branch:** `main` (pushed to `origin/main`)
 - **Automated Regression (`npm test`):** **PASS (`37/37` tests green)**
@@ -19,9 +19,10 @@
   - Replaced `getFirestore` with `initializeFirestore(..., { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })` in [appwebsite.js](../appwebsite.js) (and `experimentalAutoDetectLongPolling: true` in [adminwebsite.js](../adminwebsite.js)), eliminated composite-index `orderBy`/`where` combinations in `loadBanners()`, `autoTrackActiveOrder()`, `loadPastOrders()`, and `loadMyCoupons()` using synchronous `getOrderTimestampMs()` client-side sorting, fixed `openModal` focus selection and Track Order error UI fallback, and added a direct HTTPS Firestore REST API fallback (`fetchCollectionViaRest`) when WebChannel hits a 10-second `WatchStream` cold-cache timeout.
 - **Verification:** `37/37` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-043`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors).
 
-## Next (Optional Operational Follow-Ups)
-1. Sync the unified [firestore.rules](../firestore.rules) file into the sibling `hungrybirdspos` repo so both repositories track the identical rules source.
-2. Deploy `functions/` (`firebase deploy --only functions`) if server-side loyalty minting and `/orderTracking` projection are desired (requires Firebase Blaze plan), and configure Google Cloud Console HTTP referrer restrictions + Firebase App Check.
+## Next (Active Feature & Operational Follow-Ups)
+1. **Phase 3 Build (Milestones 0–2) & Phases 4–6 QA/Audit/Runbook:** Implement `api/chat.js`, `ai-assistant.js`, UI drawer, tests (`TC-044`–`TC-049`), live desktop/mobile browser QA, and operator setup runbook, then stop for final deploy approval before `git push origin main`.
+2. Sync the unified [firestore.rules](../firestore.rules) file into the sibling `hungrybirdspos` repo so both repositories track the identical rules source.
+3. Deploy `functions/` (`firebase deploy --only functions`) if server-side loyalty minting and `/orderTracking` projection are desired (requires Firebase Blaze plan), and configure Google Cloud Console HTTP referrer restrictions + Firebase App Check.
 
 ## Known Gaps / External Scope
 - **Live Authenticated Mutation Flows:** Live order placement, coupon redemption, and Admin writes were verified via unit/rules/contract tests rather than live production writes to avoid polluting `hungry-birds-3e16f`.
@@ -34,6 +35,9 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-25 (Phase 2 Design — Gemini AI Assistant):** Phase 1 approved; produced [docs/DESIGN.md](./DESIGN.md) covering flows, WCAG 2.2 AA tokens, bottom-left launcher placement, and drawer states.
+- **2026-11-25 (Phase 1 Architecture & Plan — Gemini AI Assistant):** Approved [docs/PRD.md](./PRD.md); produced [docs/ARCHITECTURE.md](./ARCHITECTURE.md), [docs/PLAN.md](./PLAN.md), and [ADR-0002](./adr/0002-gemini-ai-assistant-architecture.md).
+- **2026-11-25 (Phase 0 Discovery — Gemini AI Assistant):** Completed `/grill-me` requirements interview and drafted [docs/PRD.md](./PRD.md) (awaiting owner approval before Phase 1 Architecture & Plan).
 - **2026-11-25 (Timestamp Sort Fix, Track Modal Guard & SW `v6` Forced Cache Refresh):** Fixed accidentally `async` `getOrderTimestampMs()` in `appwebsite.js`, ensured `autoTrackActiveOrder()` error handler shows a non-blank fallback inside `#trackingContent`, prevented `openModal()` from focusing close X buttons by default, bumped `sw.js` & `sw-register.js` to `hungrybirds-cache-v6` with `cache: 'no-cache'` fetches, and replaced regex SW header routing in `vercel.json` with explicit literal `no-cache` routes for HTML/JS/SW files.
 - **2026-11-25 (Order Tracking / Past Orders / Coupons Index Fix):** Removed composite-index `orderBy("createdAt", "desc")` + `limit(...)` from `autoTrackActiveOrder()`, `loadPastOrders()`, and `loadMyCoupons()` in `appwebsite.js` (sorting client-side via `getOrderTimestampMs()` instead), restored manual Order ID input visibility when a signed-in user has no active order or falls back on error, added `TC-043`, and verified `37/37` tests passing.
 - **2026-11-25 (SW `v5` Self-Healing & Firestore Long-Polling/REST Fallback):** Added `sw-register.js`, updated `sw.js` (`v5`, same-origin only) and `vercel.json` (`no-cache` for SW scripts), enabled Firestore auto-detected long-polling + IndexedDB cache + HTTPS REST fallback in `appwebsite.js`/`adminwebsite.js`, and verified `36/36` tests passing + live browser reload clean.
