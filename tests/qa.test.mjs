@@ -66,6 +66,7 @@ function loadAppLogic(initialState = {}) {
     'renderMyCoupons',
     'fromFirestoreRestValue',
     'parseFirestoreRestDoc',
+    'getOrderTimestampMs',
   ];
   const snippets = fnNames.map((n) => extractFunctionSource(appJs, n)).join('\n\n');
   const elements = initialState.elements || {};
@@ -613,4 +614,17 @@ test('US-1 / US-8 | TC-042: Firestore uses auto-detected long-polling + IndexedD
   assert.deepEqual(Array.from(parsed.data.tags), ['spicy', 'popular']);
   assert.equal(parsed.data.meta.kcal, 620);
   assert.equal(parsed.data.recipeRef.id, 'rec_42');
+});
+
+test('US-5 | TC-043: Customer website Firestore queries avoid undeployed composite indexes and sort order timestamps client-side', () => {
+  assert.equal(appJs.includes('orderBy('), false, 'appwebsite.js should sort customer query results client-side without orderBy()');
+  const customerUidFilterMatches = appJs.match(/collection\(db,\s*["']onlineOrders["']\),\s*where\(["']customerUid["'],\s*["']==["'],\s*(?:currentUser\.)?uid\)/g) || [];
+  assert.equal(customerUidFilterMatches.length, 3, 'Expected all 3 customer onlineOrders queries (past orders, auto-track, coupons) to filter by customerUid without orderBy/limit');
+
+  const { getOrderTimestampMs } = loadAppLogic();
+  assert.equal(getOrderTimestampMs({ toMillis: () => 1700000000000 }), 1700000000000);
+  assert.equal(getOrderTimestampMs({ seconds: 1700000000 }), 1700000000000);
+  assert.equal(getOrderTimestampMs('2026-11-25T10:00:00.000Z'), Date.parse('2026-11-25T10:00:00.000Z'));
+  assert.equal(getOrderTimestampMs(null), 0);
+  assert.equal(getOrderTimestampMs('not-a-date'), 0);
 });

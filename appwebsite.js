@@ -22,8 +22,6 @@ import {
     increment,
     query,
     where,
-    orderBy,
-    limit,
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -1237,7 +1235,15 @@ function closePastOrdersModal() {
     closeModal($("pastOrdersModal"));
 }
 
-async function loadPastOrders() {
+async function getOrderTimestampMs(timestamp) {
+    if (!timestamp) return 0;
+    if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
+    if (typeof timestamp.seconds === "number") return timestamp.seconds * 1000;
+    const parsed = Date.parse(timestamp);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function loadPastOrders() {
     if (!currentUser) {
         openModal($("authModal"));
 
@@ -1270,16 +1276,16 @@ async function loadPastOrders() {
         pastOrdersListener = onSnapshot(
             query(
                 collection(db, "onlineOrders"),
-                where("customerUid", "==", currentUser.uid),
-                orderBy("createdAt", "desc"),
-                limit(20)
+                where("customerUid", "==", currentUser.uid)
             ),
             (snapshot) => {
                 pastOrdersCache = snapshot.docs
                     .map(docSnap => ({
                         id: docSnap.id,
                         ...docSnap.data()
-                    }));
+                    }))
+                    .sort((a, b) => getOrderTimestampMs(b.createdAt) - getOrderTimestampMs(a.createdAt))
+                    .slice(0, 20);
 
                 renderPastOrders();
             },
@@ -2123,34 +2129,35 @@ function autoTrackActiveOrder() {
     activeOrderListener = onSnapshot(
         query(
             collection(db, "onlineOrders"),
-            where("customerUid", "==", currentUser.uid),
-            orderBy("createdAt", "desc"),
-            limit(20)
+            where("customerUid", "==", currentUser.uid)
         ),
         (snapshot) => {
             const allOrders = snapshot.docs
                 .map(d => ({ id: d.id, ...d.data() }))
-                .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+                .sort((a, b) => getOrderTimestampMs(b.createdAt) - getOrderTimestampMs(a.createdAt));
 
             const activeOrder = allOrders.find(
                 o => !["COMPLETED", "REJECTED"].includes(o.status || "PENDING")
             );
 
             if (!activeOrder) {
+                idInputSection?.classList.remove("hidden");
                 trackingContent.innerHTML = `
                     <div class="text-center py-12 text-gray-500">
                         <i class="fa-solid fa-check-circle text-3xl mb-3 text-green-500"></i>
                         <p class="font-semibold text-gray-600">No active orders right now.</p>
-                        <p class="text-sm mt-1">Place an order and track it here in real time.</p>
+                        <p class="text-sm mt-1">Place an order or enter an Order ID above to track it in real time.</p>
                     </div>
                 `;
                 return;
             }
 
+            idInputSection?.classList.add("hidden");
             renderOrderTimeline(activeOrder);
         },
         (error) => {
             console.error("Auto-track error:", error);
+            idInputSection?.classList.remove("hidden");
             trackingContent.innerHTML = "";
             if (trackingError) {
                 trackingError.textContent = "Could not load your order. Please try again.";
@@ -2466,9 +2473,7 @@ async function loadMyCoupons() {
             getDocs(query(collection(db, "coupons"), where("assignedTo", "==", uid))),
             getDocs(query(
                 collection(db, "onlineOrders"),
-                where("customerUid", "==", uid),
-                orderBy("createdAt", "desc"),
-                limit(50)
+                where("customerUid", "==", uid)
             ))
         ]);
 
@@ -2476,7 +2481,8 @@ async function loadMyCoupons() {
         const coupons = couponsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const couponOrders = ordersSnap.docs
             .map(d => d.data())
-            .filter(o => o.couponCode && o.discountAmount > 0);
+            .filter(o => o.couponCode && o.discountAmount > 0)
+            .sort((a, b) => getOrderTimestampMs(b.createdAt) - getOrderTimestampMs(a.createdAt));
 
         renderMyCoupons(orderCount, coupons, couponOrders);
     } catch (err) {

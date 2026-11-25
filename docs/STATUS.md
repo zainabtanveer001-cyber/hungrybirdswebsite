@@ -3,7 +3,7 @@
 - **Current Phase:** Post-Deploy Hardening & Live Connectivity Recovery Complete
 - **Last Updated:** 2026-11-25
 - **Branch:** `main` (pushed to `origin/main`)
-- **Automated Regression (`npm test`):** **PASS (`36/36` tests green)**
+- **Automated Regression (`npm test`):** **PASS (`37/37` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
 - **CSS Build (`npm run build:css`):** **PASS (`styles.css` `42,059` bytes)**
 
@@ -16,8 +16,8 @@
 - **Live Vercel CSP, Self-Healing Service Worker `v5` & Firestore Transport Resilience (`7044b71` + latest fix):**
   - Expanded `connect-src` in [vercel.json](../vercel.json) and added `Cache-Control: no-cache, no-store, must-revalidate` for `/(sw|sw-register)\.js`.
   - Added standalone [sw-register.js](../sw-register.js) before `appwebsite.js` in [index.html](../index.html) to automatically purge pre-`v5` legacy Service Workers (`hungrybirds-cache-v1`..`v4`) that trapped browsers under an older worker `connect-src` CSP, and narrowed [sw.js](../sw.js) (`hungrybirds-cache-v5`) to same-origin shell assets only.
-  - Replaced `getFirestore` with `initializeFirestore(..., { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })` in [appwebsite.js](../appwebsite.js) (and `experimentalAutoDetectLongPolling: true` in [adminwebsite.js](../adminwebsite.js)), eliminated the composite index requirement in `loadBanners()`, and added a direct HTTPS Firestore REST API fallback (`fetchCollectionViaRest`) when WebChannel hits a 10-second `WatchStream` cold-cache timeout.
-- **Verification:** `36/36` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-042`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors).
+  - Replaced `getFirestore` with `initializeFirestore(..., { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })` in [appwebsite.js](../appwebsite.js) (and `experimentalAutoDetectLongPolling: true` in [adminwebsite.js](../adminwebsite.js)), eliminated the composite index requirement in `loadBanners()`, `autoTrackActiveOrder()`, `loadPastOrders()`, and `loadMyCoupons()`, and added a direct HTTPS Firestore REST API fallback (`fetchCollectionViaRest`) when WebChannel hits a 10-second `WatchStream` cold-cache timeout.
+- **Verification:** `37/37` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-043`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors).
 
 ## Next (Optional Operational Follow-Ups)
 1. Sync the unified [firestore.rules](../firestore.rules) file into the sibling `hungrybirdspos` repo so both repositories track the identical rules source.
@@ -34,6 +34,7 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-25 (Order Tracking / Past Orders / Coupons Index Fix):** Removed composite-index `orderBy("createdAt", "desc")` + `limit(...)` from `autoTrackActiveOrder()`, `loadPastOrders()`, and `loadMyCoupons()` in `appwebsite.js` (sorting client-side via `getOrderTimestampMs()` instead), restored manual Order ID input visibility when a signed-in user has no active order or falls back on error, added `TC-043`, and verified `37/37` tests passing.
 - **2026-11-25 (SW `v5` Self-Healing & Firestore Long-Polling/REST Fallback):** Added `sw-register.js`, updated `sw.js` (`v5`, same-origin only) and `vercel.json` (`no-cache` for SW scripts), enabled Firestore auto-detected long-polling + IndexedDB cache + HTTPS REST fallback in `appwebsite.js`/`adminwebsite.js`, and verified `36/36` tests passing + live browser reload clean.
 - **2026-11-25 (POS Rules Merge & Vercel CSP Fix):** Merged all 16 POS collections and uppercase POS roles into `firestore.rules` (`94c9bf2`, published live) and expanded Vercel CSP + client-side banner sort (`7044b71`).
 - **2026-11-25 (Remediation & Regression):** Fixed all 22 QA bugs & 22 Audit findings across commits `d3f3c43`–`923cb63`.
