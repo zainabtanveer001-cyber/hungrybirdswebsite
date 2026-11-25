@@ -15,7 +15,7 @@ npm ci
 # Rebuild minified Tailwind CSS (styles.css)
 npm run build:css
 
-# Run automated QA & security regression suite (33 tests)
+# Run automated QA & security regression suite (43 tests)
 npm test
 
 # Verify zero known dependency vulnerabilities
@@ -61,11 +61,26 @@ npx firebase-tools deploy --only functions --project hungry-birds-3e16f
 
 ---
 
-## 4. Deploy Static Website (Vercel)
+## 4. Deploy Static Website + AI Proxy (Vercel)
 
-1. Verify `styles.css` is up to date (`npm run build:css`) and `npm test` passes (`33/33`).
-2. Deploy via Vercel CLI or connected GitHub branch (`outputDirectory: "."`, security headers in `vercel.json`).
-3. Verify HTTP response headers (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) on `/` and `/admin.html`.
+1. Verify `styles.css` is up to date (`npm run build:css`) and `npm test` passes (`43/43`).
+2. Deploy via Vercel CLI or connected GitHub branch (`outputDirectory: "."`, Serverless Function `/api/chat` in [api/chat.js](../../api/chat.js), security + cache headers in [vercel.json](../../vercel.json)).
+3. Verify HTTP response headers (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) on `/` and `/admin.html`, and `Cache-Control: no-store` on `/api/chat`.
+
+### 4b. Enable Free Google AI Studio Gemini Key (3 Minutes, \$0/Month)
+
+Until `GEMINI_API_KEY` is added in Vercel, `/api/chat` returns `503 AI_NOT_CONFIGURED { fallback: true }` and the website automatically runs in instant local FAQ + budget/menu fallback mode.
+
+1. **Create your free API key:**
+   - Sign in to Google AI Studio (`https://aistudio.google.com/app/apikey`) — **no billing card required** on the Free Tier.
+   - Click **Create API key** in a Google Cloud / AI Studio project and copy the key (starts with `AIza...`). Never commit this key to git or paste it into client JS files.
+2. **Add the Environment Variable in Vercel:**
+   - Open your **Vercel Dashboard → hungrybirdswebsite project → Settings → Environment Variables**.
+   - Add **`GEMINI_API_KEY`** with your copied key (enable for **Production** and **Preview**).
+   - *(Optional)* Add **`GEMINI_MODEL`** if you ever want to pin a newer free-tier model ID first (defaults to `gemini-3.5-flash-lite` → `gemini-2.5-flash-lite` → `gemini-3.5-flash` → `gemini-2.5-flash`).
+3. **Redeploy & Smoke-Test:**
+   - Trigger a **Redeploy** in Vercel → Deployments so the serverless runtime loads `GEMINI_API_KEY`.
+   - Open the live site, tap **Ask AI** (bottom-left), tap **Meal under Rs. 1,000**, and confirm the header pill switches to **Gemini AI** (or seamlessly to **Menu helper** if Google free-tier `429` rate limit is hit).
 
 ---
 

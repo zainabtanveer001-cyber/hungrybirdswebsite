@@ -1,11 +1,11 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Phase 2 UI/UX Design Complete -> Executing Phase 3 Build (Gemini AI Customer Assistant)
+- **Current Phase:** Phase 6 Release Candidate Ready — Pending Owner Approval to Push (`origin/main`) & Configure Vercel `GEMINI_API_KEY`
 - **Last Updated:** 2026-11-25
-- **Branch:** `main` (pushed to `origin/main`)
-- **Automated Regression (`npm test`):** **PASS (`37/37` tests green)**
+- **Branch:** `main` (local commits ahead of `origin/main` awaiting deploy approval)
+- **Automated Regression (`npm test`):** **PASS (`43/43` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
-- **CSS Build (`npm run build:css`):** **PASS (`styles.css` `42,059` bytes)**
+- **CSS Build (`npm run build:css`):** **PASS (`styles.css` compiled cleanly)**
 
 ---
 
@@ -17,10 +17,14 @@
   - Expanded `connect-src` in [vercel.json](../vercel.json) and added literal `Cache-Control: no-cache` routes for `/`, `/index.html`, `/appwebsite.js`, `/adminwebsite.js`, `/sw.js`, and `/sw-register.js`.
   - Added standalone [sw-register.js](../sw-register.js) before `appwebsite.js` in [index.html](../index.html) to automatically purge pre-`v6` legacy Service Workers (`hungrybirds-cache-v1`..`v5`) and bumped [sw.js](../sw.js) (`hungrybirds-cache-v6`) with `fetch(event.request, { cache: 'no-cache' })` on same-origin assets.
   - Replaced `getFirestore` with `initializeFirestore(..., { experimentalAutoDetectLongPolling: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })` in [appwebsite.js](../appwebsite.js) (and `experimentalAutoDetectLongPolling: true` in [adminwebsite.js](../adminwebsite.js)), eliminated composite-index `orderBy`/`where` combinations in `loadBanners()`, `autoTrackActiveOrder()`, `loadPastOrders()`, and `loadMyCoupons()` using synchronous `getOrderTimestampMs()` client-side sorting, fixed `openModal` focus selection and Track Order error UI fallback, and added a direct HTTPS Firestore REST API fallback (`fetchCollectionViaRest`) when WebChannel hits a 10-second `WatchStream` cold-cache timeout.
-- **Verification:** `37/37` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-043`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors).
+- **Verification:** `43/43` automated tests passing in [tests/qa.test.mjs](../tests/qa.test.mjs) (`TC-001`–`TC-049`), `0` npm audit vulnerabilities, and live browser verification under full `vercel.json` CSP headers (`26` menu items loaded on initial load and reload, `0` console/CSP/SW errors, plus desktop `1280×800` & mobile `375×812` AI chat QA).
+- **Gemini AI Customer Assistant (`afecf40`, `6a17e79`, `2d924c3` + final UI/ops slice):**
+  - **Serverless Proxy (`api/chat.js`, `api/_lib/gemini-assistant.js`):** Zero-dependency CommonJS Vercel endpoint keeping `GEMINI_API_KEY` strictly server-side (`x-goog-api-key` header), enforcing same-origin checks, `<= 32 KB` body caps, per-IP sliding-window rate limits (`12/min`, `60/hr`), ordered free-tier model fallback (`gemini-3.5-flash-lite` → `2.5-flash-lite` → `3.5-flash` → `2.5-flash` + `GEMINI_MODEL` override), structured JSON schema allowlisting real `menuItems` IDs, and strict PII/image stripping.
+  - **Hybrid Local Engine & Accessible Chat Drawer (`ai-assistant.js`, `index.html`, `appwebsite.js`, `src/tailwind.css`):** Bottom-left `#aiChatFab` + slide-up `#aiChatDrawer` (`role="dialog"`, `z-[60]`) verified non-overlapping at `375×812` (`33.89px` clearance from mobile right CTA, `24.70px` above `#bottomNav`) and `1280×800`; 4 quick-starter chips, one-click `+ Add` to cart & `Track Order`, zero-quota deterministic FAQ router, and instant English/Roman Urdu budget/keyword fallback on `429`/`503`/offline.
+  - **Edge Headers & SW `v7`:** Updated [vercel.json](../vercel.json) (`/api/chat` `no-store`, `/ai-assistant.js` `no-cache`), [.env.example](../.env.example), [sw.js](../sw.js) (`v7`, `/api/` bypass), and [sw-register.js](../sw-register.js).
 
-## Next (Active Feature & Operational Follow-Ups)
-1. **Phase 3 Build (Milestones 0–2) & Phases 4–6 QA/Audit/Runbook:** Implement `api/chat.js`, `ai-assistant.js`, UI drawer, tests (`TC-044`–`TC-049`), live desktop/mobile browser QA, and operator setup runbook, then stop for final deploy approval before `git push origin main`.
+## Next (Release Approval & Vercel Key Setup)
+1. **Production Deploy Gate:** Owner approval to push local `main` commits to `origin/main` (triggering Vercel deploy), then complete the 3-minute free Google AI Studio `GEMINI_API_KEY` setup in [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md).
 2. Sync the unified [firestore.rules](../firestore.rules) file into the sibling `hungrybirdspos` repo so both repositories track the identical rules source.
 3. Deploy `functions/` (`firebase deploy --only functions`) if server-side loyalty minting and `/orderTracking` projection are desired (requires Firebase Blaze plan), and configure Google Cloud Console HTTP referrer restrictions + Firebase App Check.
 
@@ -35,6 +39,7 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-25 (Phases 3–6 — Gemini AI Build, Live QA, Security Audit & Runbook):** Built Milestone 0 (`afecf40` `/api/chat`), Milestone 1 (`6a17e79` `ai-assistant.js` + `sw.js` `v7`), and Milestone 2 (`2d924c3` bottom-left chat drawer + `appwebsite.js` wiring); verified `43/43` unit tests, `0` npm audit vulnerabilities, and live desktop (`1280×800`) + mobile (`375×812`) browser QA; documented free Google AI Studio + Vercel setup in [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md). Stopped before `git push origin main` for owner deploy approval.
 - **2026-11-25 (Phase 2 Design — Gemini AI Assistant):** Phase 1 approved; produced [docs/DESIGN.md](./DESIGN.md) covering flows, WCAG 2.2 AA tokens, bottom-left launcher placement, and drawer states.
 - **2026-11-25 (Phase 1 Architecture & Plan — Gemini AI Assistant):** Approved [docs/PRD.md](./PRD.md); produced [docs/ARCHITECTURE.md](./ARCHITECTURE.md), [docs/PLAN.md](./PLAN.md), and [ADR-0002](./adr/0002-gemini-ai-assistant-architecture.md).
 - **2026-11-25 (Phase 0 Discovery — Gemini AI Assistant):** Completed `/grill-me` requirements interview and drafted [docs/PRD.md](./PRD.md) (awaiting owner approval before Phase 1 Architecture & Plan).
