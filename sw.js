@@ -1,10 +1,11 @@
-const CACHE_NAME = 'hungrybirds-cache-v6';
+const CACHE_NAME = 'hungrybirds-cache-v7';
 const ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/sw-register.js',
   '/appwebsite.js',
+  '/ai-assistant.js',
   '/firebase-config.js'
 ];
 
@@ -35,8 +36,14 @@ self.addEventListener('fetch', (event) => {
   // Never intercept cross-origin requests (Firebase SDKs, Firestore/Auth APIs, CDNs, Storage images)
   if (url.origin !== self.location.origin) return;
 
-  // Never cache or intercept Service Worker bootstrap scripts
-  if (url.pathname === '/sw.js' || url.pathname === '/sw-register.js') return;
+  // Never cache or intercept serverless API endpoints or Service Worker bootstrap scripts
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname === '/sw.js' ||
+    url.pathname === '/sw-register.js'
+  ) {
+    return;
+  }
 
   // Same-origin static assets: bypass HTTP disk cache so deployments propagate immediately, cache fallback offline
   event.respondWith(

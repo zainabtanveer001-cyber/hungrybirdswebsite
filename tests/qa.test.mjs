@@ -514,7 +514,7 @@ test('US-3 / US-8 | TC-039 [AUD-014 / AUD-015 / AUD-022]: JS modules parse clean
     [
       '--experimental-vm-modules',
       '-e',
-      "import('node:vm').then(async({SourceTextModule,Script})=>{const fs=await import('node:fs');for(const f of ['firebase-config.js','appwebsite.js','adminwebsite.js']){new SourceTextModule(fs.readFileSync(f,'utf8'));}for(const s of ['sw-register.js','sw.js']){new Script(fs.readFileSync(s,'utf8'));}})",
+      "import('node:vm').then(async({SourceTextModule,Script})=>{const fs=await import('node:fs');for(const f of ['firebase-config.js','appwebsite.js','adminwebsite.js','ai-assistant.js']){new SourceTextModule(fs.readFileSync(f,'utf8'));}for(const s of ['sw-register.js','sw.js','api/chat.js','api/_lib/gemini-assistant.js']){new Script(fs.readFileSync(s,'utf8'));}})",
     ],
     { cwd: ROOT, stdio: 'pipe' }
   );
@@ -561,9 +561,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v6 caches before module boot, sw.js v6 skips cross-origin requests and bypasses HTTP cache, and vercel.json uses literal no-cache routes', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v7 caches before module boot, sw.js v7 skips cross-origin & /api/ requests, and vercel.json uses literal no-cache routes', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v6'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v7'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -572,19 +572,20 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v6 caches before module boo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v6'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v7'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
+  assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
 
   const headerSources = (vercelJson.headers || []).map((h) => h.source);
   assert.equal(headerSources.some((s) => s.includes('(sw|sw-register)')), false, 'vercel.json should use literal SW route paths rather than regex alternation');
-  for (const literalPath of ['/sw.js', '/sw-register.js', '/appwebsite.js', '/adminwebsite.js', '/index.html', '/']) {
+  for (const literalPath of ['/api/chat', '/ai-assistant.js', '/sw.js', '/sw-register.js', '/appwebsite.js', '/adminwebsite.js', '/index.html', '/']) {
     const rule = (vercelJson.headers || []).find((h) => h.source === literalPath);
     assert.ok(rule, `Missing explicit Cache-Control header rule for ${literalPath} in vercel.json`);
     assert.equal(
-      rule.headers.some((h) => h.key === 'Cache-Control' && h.value.includes('no-cache')),
+      rule.headers.some((h) => h.key === 'Cache-Control' && /no-cache|no-store/.test(h.value)),
       true,
-      `Missing no-cache Cache-Control value on ${literalPath}`
+      `Missing no-cache/no-store Cache-Control value on ${literalPath}`
     );
   }
 });
@@ -843,4 +844,81 @@ test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key hea
   assert.equal(limitedRes.statusCode, 429);
   assert.equal(limitedRes.body.fallback, true);
   assert.ok(Number(limitedRes.headers['Retry-After']) >= 1);
+});
+
+function loadAiLogic() {
+  const aiSource = readRepoFile('ai-assistant.js').replace(/\bexport\s+(?=(?:async\s+)?function\b|const\b)/g, '');
+  const context = { Date, Math, Number, String, Boolean, Array, Object, Map, Set, RegExp, JSON };
+  vm.createContext(context);
+  vm.runInContext(aiSource, context);
+  return context;
+}
+
+test('US-AI-2 / US-AI-4 / US-AI-6 | TC-046: Zero-quota local FAQ router answers deterministic FAQs in <100ms without calling /api/chat and escalates unknown policies to WhatsApp', () => {
+  const { tryLocalFaqAnswer, escapeAiHtml } = loadAiLogic();
+
+  const track = tryLocalFaqAnswer('Track my order please', { cart: [], orderType: 'DELIVERY' });
+  assert.equal(track?.source, 'local');
+  assert.deepEqual(Array.from(track?.actions || []), ['TRACK_ORDER']);
+
+  const deliv = tryLocalFaqAnswer('Delivery info?', {
+    cart: [{ id: '1', name: 'Fries', price: 300, qty: 1 }],
+    orderType: 'DELIVERY',
+  });
+  assert.equal(deliv?.source, 'local');
+  assert.equal(deliv?.reply.includes('500'), true);
+  assert.equal(deliv?.reply.includes('200 away'), true);
+
+  const hours = tryLocalFaqAnswer('What are your opening hours and halal allergens?', {});
+  assert.equal(hours?.source, 'local');
+  assert.deepEqual(Array.from(hours?.actions || []), ['WHATSAPP']);
+  assert.equal(hours?.reply.includes('0325-7867774'), true);
+
+  const loyalty = tryLocalFaqAnswer('How does the 10 orders loyalty coupon work?', {});
+  assert.equal(loyalty?.source, 'local');
+  assert.equal(loyalty?.reply.includes('10%'), true);
+
+  assert.equal(tryLocalFaqAnswer('bhai 1000 mein 2 burgers suggest karo', {}), null);
+  assert.equal(tryLocalFaqAnswer('Best burgers?', {}), null);
+  assert.equal(escapeAiHtml('<img src=x onerror="alert(1)">'), '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+});
+
+test('US-AI-2 / US-AI-6 / US-AI-7 | TC-047: Client AI sanitizer drops all PII/images and local fallback matches real items by budget/keyword in English & Roman Urdu', () => {
+  const { buildSanitizedAiPayload, buildLocalMenuFallback } = loadAiLogic();
+
+  const sampleMenu = [
+    { id: 'm1', name: 'Zinger Burger', price: 450, categoryId: 'c1', img: 'data:image/jpeg;base64,HUGEBLOB' },
+    { id: 'm2', name: 'Chicken Karrahi Half', price: 1100, categoryId: 'c2', img: 'data:image/jpeg;base64,ANOTHER' },
+    { id: 'm3', name: 'Pepsi 500ml', price: 150, categoryId: 'c3', img: '' },
+  ];
+  const sampleCategories = [
+    { id: 'c1', name: 'Fast Food' },
+    { id: 'c2', name: 'Karrahi' },
+    { id: 'c3', name: 'Cold Drinks' },
+  ];
+
+  const payload = buildSanitizedAiPayload({
+    message: 'Suggest burgers under 1000',
+    history: [{ role: 'user', text: 'hi' }],
+    menuItems: sampleMenu,
+    categories: sampleCategories,
+    cart: [{ id: 'm1', name: 'Zinger Burger', price: 450, qty: 1, customerUid: 'secret_uid', phone: '03001112233' }],
+    orderType: 'DELIVERY',
+  });
+
+  const json = JSON.stringify(payload);
+  assert.equal(json.includes('data:image'), false);
+  assert.equal(json.includes('secret_uid'), false);
+  assert.equal(json.includes('03001112233'), false);
+  assert.equal(payload.menu[0].category, 'Fast Food');
+  assert.equal(payload.cart.subtotal, 450);
+
+  const budgetReply = buildLocalMenuFallback('1000 mein burger aur drink batao', sampleMenu, sampleCategories, [], 'DELIVERY');
+  assert.equal(budgetReply.source, 'fallback');
+  assert.equal(budgetReply.recommendedItemIds.includes('m1'), true);
+  assert.equal(budgetReply.recommendedItemIds.includes('m2'), false, 'Rs. 1100 item should not exceed Rs. 1000 budget pick');
+
+  const tinyBudget = buildLocalMenuFallback('Meal under Rs 100', sampleMenu, sampleCategories, [], 'DELIVERY');
+  assert.deepEqual(Array.from(tinyBudget.recommendedItemIds), ['m3']);
+  assert.equal(tinyBudget.reply.includes('150'), true);
 });
