@@ -636,3 +636,211 @@ test('US-5 | TC-043: Customer website Firestore queries avoid undeployed composi
   assert.equal(getOrderTimestampMs(null), 0);
   assert.equal(getOrderTimestampMs('not-a-date'), 0);
 });
+
+// =====================================================================
+// 8. Gemini AI Customer Assistant Tests (US-AI-1 .. US-AI-7)
+// =====================================================================
+
+function createMockRes() {
+  const res = {
+    statusCode: 200,
+    headers: {},
+    body: null,
+    setHeader(k, v) {
+      this.headers[k] = v;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+    writeHead(code, hdrs = {}) {
+      this.statusCode = code;
+      Object.assign(this.headers, hdrs);
+    },
+    end(str) {
+      this.body = str ? JSON.parse(str) : null;
+    },
+  };
+  return res;
+}
+
+test('US-AI-5 / US-AI-7 | TC-044: /api/chat validates method, origin, payload size/schema, strips PII/images, and returns 503 fallback when key missing', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { createChatHandler } = require('../api/chat.js');
+  const { validateAndSanitizeInput } = require('../api/_lib/gemini-assistant.js');
+
+  const envExample = readRepoFile('.env.example');
+  assert.equal(envExample.includes('GEMINI_API_KEY='), true);
+  assert.equal(envExample.includes('GEMINI_MODEL='), true);
+  const apiChatHeader = (vercelJson.headers || []).find((h) => h.source === '/api/chat');
+  assert.equal(apiChatHeader?.headers?.some((h) => h.key === 'Cache-Control' && h.value === 'no-store'), true);
+
+  // Method check (405)
+  const handlerNoKey = createChatHandler({ env: {} });
+  const getRes = createMockRes();
+  await handlerNoKey({ method: 'GET', headers: { host: 'hungrybirds.pk' } }, getRes);
+  assert.equal(getRes.statusCode, 405);
+  assert.equal(getRes.headers['Cache-Control'], 'no-store');
+
+  // Cross-origin check (403)
+  const corsRes = createMockRes();
+  await handlerNoKey(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', origin: 'https://evil.example' },
+      body: { message: 'hello', menu: [{ id: '1', name: 'Zinger', price: 450 }] },
+    },
+    corsRes
+  );
+  assert.equal(corsRes.statusCode, 403);
+
+  // Invalid body check (400)
+  const badRes = createMockRes();
+  await handlerNoKey(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', origin: 'https://hungrybirds.pk' },
+      body: { message: '   ', menu: [] },
+    },
+    badRes
+  );
+  assert.equal(badRes.statusCode, 400);
+  assert.equal(badRes.body.fallback, false);
+
+  // Missing API key -> 503 with fallback: true
+  const noKeyRes = createMockRes();
+  await handlerNoKey(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', origin: 'https://hungrybirds.pk' },
+      body: {
+        message: 'Meal under 1000',
+        menu: [{ id: 'item_1', name: 'Zinger', price: 450, category: 'Burgers', img: 'data:image/jpeg;base64,ABC' }],
+      },
+    },
+    noKeyRes
+  );
+  assert.equal(noKeyRes.statusCode, 503);
+  assert.equal(noKeyRes.body.error, 'AI_NOT_CONFIGURED');
+  assert.equal(noKeyRes.body.fallback, true);
+
+  // PII and base64 image stripping
+  const sanitized = validateAndSanitizeInput({
+    message: 'Suggest food',
+    email: 'secret@example.com',
+    phone: '03001234567',
+    address: 'House 5',
+    customerUid: 'uid_secret',
+    orderId: 'ord_99',
+    menu: [
+      { id: 'm1', name: 'Zinger', price: 450, category: 'Fast Food', img: 'data:image/jpeg;base64,SECRET' },
+      { id: 'm2', name: 'data:image/png;base64,XYZ', price: 100, category: 'Bad' },
+    ],
+    cart: { items: [{ id: 'm1', name: 'Zinger', price: 450, qty: 1 }], subtotal: 450, phone: '03001234567' },
+    orderType: 'DELIVERY',
+  });
+  assert.equal(sanitized.ok, true);
+  const serialized = JSON.stringify(sanitized.value);
+  for (const forbidden of ['secret@example.com', '03001234567', 'House 5', 'uid_secret', 'ord_99', 'data:image']) {
+    assert.equal(serialized.includes(forbidden), false, `Sanitized payload leaked ${forbidden}`);
+  }
+  assert.equal(sanitized.value.menu.length, 1);
+});
+
+test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key header, filters hallucinated IDs, handles 404 model failover, and enforces rate limits', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { createChatHandler } = require('../api/chat.js');
+  const { createRateLimiter } = require('../api/_lib/gemini-assistant.js');
+
+  const fetchCalls = [];
+  const fakeFetch = async (url, init) => {
+    fetchCalls.push({ url, init });
+    if (fetchCalls.length === 1) {
+      return { ok: false, status: 404, async json() { return {}; } };
+    }
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      reply: 'Try our Zinger Burger!',
+                      recommendedItemIds: ['item_1', 'hallucinated_id', 'item_1'],
+                      actions: ['OPEN_CART', 'INVALID_ACTION'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        };
+      },
+    };
+  };
+
+  const limiter = createRateLimiter({ minuteLimit: 2, hourLimit: 10 });
+  const handler = createChatHandler({
+    fetchImpl: fakeFetch,
+    env: { GEMINI_API_KEY: 'test-secret-key', GEMINI_MODEL: 'custom-flash-model' },
+    rateLimiter: limiter,
+  });
+
+  const okRes = createMockRes();
+  await handler(
+    {
+      method: 'POST',
+      headers: { host: 'localhost:4173', origin: 'http://127.0.0.1:4173', 'x-forwarded-for': '203.0.113.10' },
+      body: {
+        message: 'Best burger?',
+        menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450, category: 'Burgers' }],
+      },
+    },
+    okRes
+  );
+
+  assert.equal(okRes.statusCode, 200);
+  assert.equal(okRes.body.source, 'gemini');
+  assert.equal(okRes.body.model, 'gemini-3.5-flash-lite');
+  assert.deepEqual(okRes.body.recommendedItemIds, ['item_1']);
+  assert.deepEqual(okRes.body.actions, ['OPEN_CART']);
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls[0].url.includes('custom-flash-model'), true);
+  assert.equal(fetchCalls[0].url.includes('test-secret-key'), false, 'API key must NOT appear in URL');
+  assert.equal(fetchCalls[0].init.headers['x-goog-api-key'], 'test-secret-key');
+
+  // Second request within minuteLimit=2 succeeds; third is rate limited (429 + fallback: true)
+  const okRes2 = createMockRes();
+  await handler(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', 'x-forwarded-for': '203.0.113.10' },
+      body: { message: 'Second ask', menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450 }] },
+    },
+    okRes2
+  );
+  assert.equal(okRes2.statusCode, 200);
+
+  const limitedRes = createMockRes();
+  await handler(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', 'x-forwarded-for': '203.0.113.10' },
+      body: { message: 'Third ask', menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450 }] },
+    },
+    limitedRes
+  );
+  assert.equal(limitedRes.statusCode, 429);
+  assert.equal(limitedRes.body.fallback, true);
+  assert.ok(Number(limitedRes.headers['Retry-After']) >= 1);
+});
