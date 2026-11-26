@@ -2,11 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom CSS from Index.html */
+/* Hungry Birds Brand System Tokens */
 :root {
-    --orange: #f97316;
-    --orange-dark: #ea580c;
-    --ink: #111827;
+    --brand-red: #C62822;
+    --brand-red-dark: #9F1D18;
+    --brand-espresso: #231711;
+    --brand-gold: #E8A838;
+    --brand-cream: #FAF7F2;
+    --orange: #C62822;
+    --orange-dark: #9F1D18;
+    --ink: #231711;
 }
 
 /* ---------------------------------------------------------
@@ -19,18 +24,19 @@ html {
 
 body {
     overflow-x: hidden;
+    color: var(--brand-espresso);
     background:
         radial-gradient(
-            circle at 10% 15%,
-            rgba(249, 115, 22, .07),
-            transparent 24rem
+            circle at 10% 10%,
+            rgba(198, 40, 34, .05),
+            transparent 26rem
         ),
         radial-gradient(
-            circle at 92% 45%,
-            rgba(251, 146, 60, .06),
-            transparent 22rem
+            circle at 90% 38%,
+            rgba(232, 168, 56, .06),
+            transparent 24rem
         ),
-        #f8fafc;
+        var(--brand-cream);
 }
 
 button,
@@ -52,49 +58,18 @@ input {
 }
 
 /* ---------------------------------------------------------
-   HERO
---------------------------------------------------------- */
-
-.hero-orb {
-    position: absolute;
-    border-radius: 9999px;
-    pointer-events: none;
-    filter: blur(2px);
-}
-
-.hero-grid {
-    background-image:
-        linear-gradient(
-            rgba(148, 163, 184, .075) 1px,
-            transparent 1px
-        ),
-        linear-gradient(
-            90deg,
-            rgba(148, 163, 184, .075) 1px,
-            transparent 1px
-        );
-    background-size: 28px 28px;
-    mask-image:
-        linear-gradient(
-            to bottom,
-            black,
-            transparent
-        );
-}
-
-/* ---------------------------------------------------------
    REVEAL ANIMATION
 --------------------------------------------------------- */
 
 .reveal {
     opacity: 0;
     transform:
-        translateY(18px)
-        scale(.985);
+        translateY(14px)
+        scale(.99);
     transition:
-        opacity .65s
+        opacity .5s
             cubic-bezier(.22, 1, .36, 1),
-        transform .65s
+        transform .5s
             cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -113,52 +88,32 @@ input {
     position: relative;
     transform: translateY(0);
     transition:
-        transform .35s
+        transform .28s
             cubic-bezier(.22, 1, .36, 1),
-        box-shadow .35s ease,
-        border-color .35s ease;
+        box-shadow .28s ease,
+        border-color .28s ease;
     will-change: transform;
 }
 
-.menu-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        linear-gradient(
-            120deg,
-            rgba(255,255,255,0) 35%,
-            rgba(255,255,255,.45) 50%,
-            rgba(255,255,255,0) 65%
-        );
-    transform: translateX(-130%);
-    transition: transform .8s ease;
-}
-
 .menu-card:hover {
-    transform: translateY(-7px);
+    transform: translateY(-4px);
     box-shadow:
-        0 18px 42px
-        rgba(15, 23, 42, .13);
+        0 16px 36px
+        rgba(35, 23, 17, .11);
     border-color:
-        rgba(249, 115, 22, .28);
-}
-
-.menu-card:hover::after {
-    transform: translateX(130%);
+        rgba(198, 40, 34, .28);
 }
 
 .menu-card img {
     transition:
-        transform .65s
+        transform .55s
             cubic-bezier(.22, 1, .36, 1),
-        filter .4s ease;
+        filter .35s ease;
 }
 
 .menu-card:hover img {
-    transform: scale(1.04);
-    filter: saturate(1.02);
+    transform: scale(1.03);
+    filter: saturate(1.03);
 }
 
 /* ---------------------------------------------------------
@@ -170,10 +125,11 @@ input {
     isolation: isolate;
     transform: translateZ(0);
     transition:
-        color .25s ease,
-        background-color .25s ease,
-        box-shadow .25s ease,
-        transform .25s ease;
+        color .2s ease,
+        background-color .2s ease,
+        border-color .2s ease,
+        box-shadow .2s ease,
+        transform .2s ease;
 }
 
 .category-btn:hover {
@@ -182,54 +138,12 @@ input {
 
 .category-btn.active {
     box-shadow:
-        0 8px 22px
-        rgba(249, 115, 22, .24);
-}
-
-.category-btn.active::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background:
-        linear-gradient(
-            100deg,
-            rgba(255,255,255,.08),
-            rgba(255,255,255,.22),
-            rgba(255,255,255,.08)
-        );
-    animation:
-        categoryShimmer
-        2.2s linear infinite;
-    z-index: -1;
-}
-
-.floating-action {
-    animation: floatingActionPulse 2.2s ease-in-out infinite;
-}
-
-@keyframes floatingActionPulse {
-    0%, 100% {
-        transform: translateY(0);
-        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.24);
-    }
-    50% {
-        transform: translateY(-2px);
-        box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
-    }
-}
-
-@keyframes categoryShimmer {
-    from {
-        transform: translateX(-120%);
-    }
-    to {
-        transform: translateX(120%);
-    }
+        0 8px 20px
+        rgba(198, 40, 34, .22);
 }
 
 /* ---------------------------------------------------------
-   MODALS
+   MODALS & SLIDE-OVER DRAWER
 --------------------------------------------------------- */
 
 .modal-backdrop {
@@ -249,9 +163,9 @@ input {
         translateY(18px)
         scale(.96);
     transition:
-        opacity .3s
+        opacity .28s
             cubic-bezier(.22,1,.36,1),
-        transform .38s
+        transform .34s
             cubic-bezier(.22,1,.36,1);
 }
 
@@ -260,6 +174,24 @@ input {
     transform:
         translateY(0)
         scale(1);
+}
+
+.drawer-panel {
+    opacity: 1;
+    transform: translateY(24px);
+    transition:
+        transform .32s cubic-bezier(.22, 1, .36, 1);
+}
+
+@media (min-width: 640px) {
+    .drawer-panel {
+        transform: translateX(100%);
+    }
+}
+
+.modal-backdrop.is-open .drawer-panel {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
 }
 
 /* ---------------------------------------------------------
@@ -310,7 +242,7 @@ input {
     padding: 10px 4px 8px;
     font-size: 11px;
     font-weight: 600;
-    color: #94a3b8;
+    color: #5C493F;
     transition: color .2s ease;
 }
 
@@ -319,7 +251,7 @@ input {
 }
 
 .bottom-nav-btn.active {
-    color: var(--orange);
+    color: var(--brand-red);
 }
 
 /* ---------------------------------------------------------

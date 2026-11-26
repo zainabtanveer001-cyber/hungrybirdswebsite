@@ -1,9 +1,9 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Category Menu Grouping (4 Items + Show More) Complete — Ready to Push to `origin/main`
+- **Current Phase:** Storefront Brand Identity & International UI/UX Redesign Complete (`assets/logo.png` + `assets/hero-feast.jpg`) — Ready to Push to `origin/main`
 - **Last Updated:** 2026-11-26
 - **Branch:** `main` (local commit ahead of `origin/main` until push approved)
-- **Automated Regression (`npm test`):** **PASS (`46/46` tests green)**
+- **Automated Regression (`npm test`):** **PASS (`47/47` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
 - **CSS Build (`npm run build:css`):** **PASS (`styles.css` compiled cleanly)**
 
@@ -39,6 +39,7 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-26 (International Brand Redesign Around Mascot Logo):** Extracted transparent rooster-chef emblem ([assets/logo.png](../assets/logo.png)) and studio hero photography ([assets/hero-feast.jpg](../assets/hero-feast.jpg)); established `#C62822` crimson / `#231711` espresso / `#FAF7F2` cream / `#E8A838` gold tokens (`WCAG 2.2 AA`) with `Bricolage Grotesque` + `Plus Jakarta Sans` in [tailwind.config.js](../tailwind.config.js), [src/tailwind.css](../src/tailwind.css), [vercel.json](../vercel.json), [index.html](../index.html), [ai-assistant.js](../ai-assistant.js), and [docs/DESIGN.md](./DESIGN.md); added photo-led editorial hero with Delivery/Takeaway switcher, Store Utility Bar (eliminating mobile bottom-right card obstruction), sticky Menu Search (`#menuSearchInput` + `filterMenuItemsByQuery`), Dish Quick-View modal (`#itemDetailModal`), right slide-over Cart Drawer (`#cartModal`), updated `#trackOrderBtn` (`fa-receipt`), removed infinite shimmer/pulse animations, bumped SW to `hungrybirds-cache-v11` ([sw.js](../sw.js), [sw-register.js](../sw-register.js)), and added `TC-053` (`47/47` tests green).
 - **2026-11-26 (Grouped 4-Items-Per-Category Menu & Show More/Show Less):** Updated [index.html](../index.html) and [appwebsite.js](../appwebsite.js) (`buildCategoryMenuSections`, `renderMenu`, `filterMenu`, `toggleCategoryExpand`) so `#menuGrid` renders grouped category sections showing up to 4 items per category (2×2 on mobile/tablet, 1×4 on desktop) with inline `"Show more (N more)"` / `"Show less"` toggles in both `"All"` and single-category views; rebuilt [styles.css](../styles.css), bumped SW cache to `hungrybirds-cache-v10` ([sw.js](../sw.js), [sw-register.js](../sw-register.js)), added `TC-052` in [tests/qa.test.mjs](../tests/qa.test.mjs) (`46/46` passing, `0` audit vulnerabilities), and verified live at `1280×800` and `375×812`.
 - **2026-11-26 (Admin AI Training Tab & `/aiConfig/knowledge`):** Added tabbed Admin layout in [admin.html](../admin.html) (`Customers & Orders`, `Coupons & Banners`, `AI Training`), `/aiConfig/{docId}` rules in [firestore.rules](../firestore.rules), admin CRUD in [adminwebsite.js](../adminwebsite.js), storefront `/aiConfig/knowledge` loading in [appwebsite.js](../appwebsite.js), owner-FAQ/knowledge grounding in [ai-assistant.js](../ai-assistant.js) and [api/_lib/gemini-assistant.js](../api/_lib/gemini-assistant.js), bumped SW to `hungrybirds-cache-v9`, and added `TC-050`–`TC-051` (`45/45` tests passing).
 - **2026-11-25 (Vercel `/api/chat` Routing, Evergreen Gemini Aliases & Diversified Fallback):** Removed conflicting `"outputDirectory": "."` from [vercel.json](../vercel.json) so `/api/chat.js` executes cleanly as a Vercel Serverless Function, updated `DEFAULT_MODEL_CHAIN` to `gemini-flash-lite-latest` / `gemini-flash-latest` with `maxOutputTokens: 1024` and plain-text recovery, prevented unmatched fallback queries from repeating the same 3 cheapest items (added greeting, menu overview, price lookup, and family-meal matching in `ai-assistant.js`), and bumped Service Worker to `hungrybirds-cache-v8`.

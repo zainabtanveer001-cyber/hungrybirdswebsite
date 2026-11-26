@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hungrybirds-cache-v10';
+const CACHE_NAME = 'hungrybirds-cache-v11';
 const ASSETS = [
   '/',
   '/index.html',
@@ -6,7 +6,9 @@ const ASSETS = [
   '/sw-register.js',
   '/appwebsite.js',
   '/ai-assistant.js',
-  '/firebase-config.js'
+  '/firebase-config.js',
+  '/assets/logo.png',
+  '/assets/hero-feast.jpg'
 ];
 
 self.addEventListener('install', (event) => {

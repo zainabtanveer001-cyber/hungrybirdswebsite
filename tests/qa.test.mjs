@@ -68,6 +68,7 @@ function loadAppLogic(initialState = {}) {
     'parseFirestoreRestDoc',
     'getOrderTimestampMs',
     'buildCategoryMenuSections',
+    'filterMenuItemsByQuery',
   ];
   const snippets = fnNames.map((n) => extractFunctionSource(appJs, n)).join('\n\n');
   const elements = initialState.elements || {};
@@ -396,11 +397,12 @@ test('US-4 | TC-016 [BUG-011]: #myCouponsBtn has a single click binding', () => 
 });
 
 test('US-5 | TC-018 [BUG-012]: trackOrderModal supports Escape/backdrop/Enter and pastOrdersModal unsubscribes listener on all closes', () => {
-  assert.equal(/\$\("trackOrderModal"\)\s*\]\.forEach/.test(appJs), true);
+  assert.equal(/\$\("trackOrderModal"\)[\s\S]{0,60}\]\.forEach/.test(appJs), true);
   const escIdx = appJs.indexOf('// ===== Escape closes modal =====');
   const escSection = appJs.slice(escIdx, escIdx + 1200);
   assert.equal(escSection.includes('closeTrackOrderModal()'), true);
   assert.equal(escSection.includes('closePastOrdersModal()'), true);
+  assert.equal(escSection.includes('closeItemDetailModal()'), true);
   assert.equal(/\$\("orderIdInput"\)\?\.addEventListener\(\s*"keydown"/.test(appJs), true);
 });
 
@@ -417,8 +419,8 @@ test('US-1 | TC-004 [BUG-009 / AUD-009]: Banner slides render safe clickable lin
   assert.equal(getSafeUrl('data:text/html,<script>alert(1)</script>'), '');
 });
 
-test('US-6 | TC-020 [BUG-015 & BUG-016 / AUD-017]: Modals start hidden with dialog ARIA and sit above mobile CTA bar', () => {
-  for (const modalId of ['authModal', 'cartModal', 'pastOrdersModal', 'myCouponsModal', 'trackOrderModal']) {
+test('US-6 | TC-020 [BUG-015 & BUG-016 / AUD-017]: Modals start hidden with dialog ARIA and sit above mobile bottom nav and AI FAB', () => {
+  for (const modalId of ['authModal', 'cartModal', 'pastOrdersModal', 'myCouponsModal', 'trackOrderModal', 'itemDetailModal']) {
     const tag = indexHtml.match(new RegExp(`<div\\s+id="${modalId}"[\\s\\S]*?>`))?.[0] || '';
     const classes = (tag.match(/class="([^"]*)"/)?.[1] || '').split(/\s+/);
     assert.equal(classes.includes('hidden'), true, `#${modalId} missing hidden`);
@@ -427,11 +429,10 @@ test('US-6 | TC-020 [BUG-015 & BUG-016 / AUD-017]: Modals start hidden with dial
   }
 
   const modalZ = Number(indexHtml.match(/id="cartModal"[\s\S]{0,200}z-\[(\d+)\]/)?.[1] || 0);
-  const mobileBarClass = indexHtml.match(/class="fixed bottom-20 right-3 z-([^"]+)"/)?.[1] || '';
-  const mobileBarZ = mobileBarClass.startsWith('[')
-    ? Number(mobileBarClass.replace(/\D/g, ''))
-    : Number(mobileBarClass.split(/\s+/)[0]);
-  assert.equal(mobileBarZ < modalZ, true, `Mobile CTA z-${mobileBarZ} must be below modal z-[${modalZ}]`);
+  const fabZ = Number(indexHtml.match(/id="aiChatFab"[\s\S]{0,200}\bz-(\d+)\b/)?.[1] || 0);
+  const bottomNavZ = Number(indexHtml.match(/id="bottomNav"[\s\S]{0,200}\bz-(\d+)\b/)?.[1] || 0);
+  assert.equal(fabZ > 0 && fabZ < modalZ, true, `AI FAB z-${fabZ} must sit below modal z-[${modalZ}]`);
+  assert.equal(bottomNavZ > 0 && bottomNavZ < modalZ, true, `Bottom nav z-${bottomNavZ} must sit below modal z-[${modalZ}]`);
 
   assert.equal(/<iframe[\s\S]*?title="[^"]+"/.test(indexHtml), true);
   assert.equal(/<iframe[\s\S]*?title="[^"]+"/.test(mapHtml), true);
@@ -564,9 +565,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v10 caches before module boot, sw.js v10 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v11 caches before module boot, sw.js v11 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v10'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v11'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -575,7 +576,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v10 caches before module bo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v10'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v11'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -1136,4 +1137,48 @@ test('US-1 | TC-052: Menu groups by category with 4-item cap, inline Show more/S
   assert.equal(appJs.includes('toggle-category-expand'), true);
   assert.equal(appJs.includes('aria-expanded'), true);
   assert.equal(/\bonclick=/.test(appJs), false, 'appwebsite.js must remain free of inline onclick handlers');
+});
+
+test('US-1 / UX-10 | TC-053: Storefront uses mascot logo brand system, hero photo, Google Fonts CSP, slide-over cart drawer, live menu search, and uncluttered mobile layout', () => {
+  const srcTailwind = readRepoFile('src/tailwind.css');
+
+  assert.equal(existsCaseSensitive(ROOT, 'assets/logo.png'), true, 'assets/logo.png must exist');
+  assert.equal(existsCaseSensitive(ROOT, 'assets/hero-feast.jpg'), true, 'assets/hero-feast.jpg must exist');
+  assert.equal(indexHtml.includes('assets/logo.png'), true);
+  assert.equal(indexHtml.includes('assets/hero-feast.jpg'), true);
+
+  const cspHeader = vercelJson.headers?.[0]?.headers?.find((h) => h.key === 'Content-Security-Policy')?.value || '';
+  assert.equal(cspHeader.includes('https://fonts.googleapis.com'), true, 'CSP style-src must allow Google Fonts stylesheets');
+  assert.equal(cspHeader.includes('https://fonts.gstatic.com'), true, 'CSP font-src must allow Google Fonts font files');
+
+  const trackBtnHtml = indexHtml.match(/<button[\s\S]*?id="trackOrderBtn"[\s\S]*?>[\s\S]*?<\/button>/)?.[0] || '';
+  assert.equal(trackBtnHtml.includes('fa-receipt'), true, '#trackOrderBtn must use receipt icon, not magnifying glass');
+  assert.equal(trackBtnHtml.includes('fa-magnifying-glass'), false);
+  assert.equal(trackBtnHtml.includes('aria-label="Track Order"'), true);
+
+  assert.equal(indexHtml.includes('id="menuSearchInput"'), true);
+  assert.equal(indexHtml.includes('aria-label="Search menu items"'), true);
+  assert.equal(indexHtml.includes('drawer-panel'), true, '#cartModal should use responsive slide-over drawer-panel');
+  assert.equal(indexHtml.includes('fixed bottom-20 right-3 z-40 md:hidden'), false, 'Legacy overlapping mobile Directions/Call floating pill must be removed');
+
+  assert.equal(srcTailwind.includes('categoryShimmer'), false, 'Gimmicky active category shimmer removed');
+  assert.equal(srcTailwind.includes('floatingActionPulse'), false, 'Gimmicky floating pulse animation removed');
+
+  const { filterMenuItemsByQuery } = loadAppLogic();
+  const sampleCats = [
+    { id: 'ALL', name: 'All' },
+    { id: 'c1', name: 'Fast Food' },
+    { id: 'c2', name: 'Karrahi' },
+  ];
+  const sampleItems = [
+    { id: '1', name: 'Chicken Zinger Burger', price: 450, categoryId: 'c1' },
+    { id: '2', name: 'Beef Karrahi Half', price: 1400, categoryId: 'c2' },
+    { id: '3', name: 'Fries Regular', price: 200, categoryId: 'c1' },
+  ];
+
+  assert.equal(filterMenuItemsByQuery(sampleItems, '', sampleCats).length, 3);
+  assert.deepEqual(Array.from(filterMenuItemsByQuery(sampleItems, 'zinger', sampleCats).map((i) => i.id)), ['1']);
+  assert.deepEqual(Array.from(filterMenuItemsByQuery(sampleItems, 'fast burger', sampleCats).map((i) => i.id)), ['1']);
+  assert.deepEqual(Array.from(filterMenuItemsByQuery(sampleItems, 'karrahi', sampleCats).map((i) => i.id)), ['2']);
+  assert.equal(filterMenuItemsByQuery(sampleItems, 'pizza', sampleCats).length, 0);
 });

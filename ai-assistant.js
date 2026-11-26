@@ -590,16 +590,16 @@ export function initAiAssistant({
         return `
             <div class="mt-2.5 space-y-2">
                 ${validItems.map((item) => `
-                    <div class="flex items-center justify-between gap-2 rounded-2xl border border-orange-100 bg-white px-3 py-2 shadow-sm">
+                    <div class="flex items-center justify-between gap-2 rounded-2xl border border-brand-sand bg-white px-3 py-2 shadow-sm">
                         <div class="min-w-0">
-                            <div class="truncate text-xs font-bold text-gray-900">${escapeAiHtml(item.name)}</div>
-                            <div class="text-xs font-extrabold text-orange-600">Rs. ${Number(item.price || 0).toLocaleString()}</div>
+                            <div class="truncate text-xs font-bold text-brand-espresso">${escapeAiHtml(item.name)}</div>
+                            <div class="text-xs font-extrabold text-brand-red tabular-nums">Rs. ${Number(item.price || 0).toLocaleString()}</div>
                         </div>
                         <button
                             type="button"
                             data-ai-action="add-item"
                             data-id="${escapeAiHtml(item.id)}"
-                            class="shrink-0 rounded-xl bg-gray-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-500 transition-colors pressable"
+                            class="shrink-0 rounded-xl bg-brand-espresso px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-red transition-colors pressable"
                         >
                             + Add
                         </button>
@@ -629,7 +629,7 @@ export function initAiAssistant({
                     <button
                         type="button"
                         data-ai-action="open-cart"
-                        class="inline-flex items-center gap-1.5 rounded-xl bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-800 hover:bg-orange-200 transition-colors pressable"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-brand-redSoft px-3 py-1.5 text-xs font-bold text-brand-redDark hover:bg-brand-red/15 transition-colors pressable"
                     >
                         <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
                         <span>Open Cart</span>
@@ -661,7 +661,7 @@ export function initAiAssistant({
             if (msg.role === "user") {
                 return `
                     <div class="flex justify-end">
-                        <div class="max-w-[85%] rounded-2xl rounded-br-sm bg-gray-900 px-4 py-2.5 text-sm text-white shadow-sm">
+                        <div class="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-espresso px-4 py-2.5 text-sm text-white shadow-sm">
                             ${escapeAiHtml(msg.text)}
                         </div>
                     </div>
@@ -669,12 +669,12 @@ export function initAiAssistant({
             }
 
             const modeBadge = msg.source === "fallback"
-                ? `<div class="mb-1 text-[11px] font-semibold text-orange-700">Menu helper (instant local mode)</div>`
+                ? `<div class="mb-1 text-[11px] font-semibold text-brand-redDark">Menu helper (instant local mode)</div>`
                 : "";
 
             return `
                 <div class="flex justify-start">
-                    <div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-orange-100 bg-orange-50/70 px-4 py-3 text-sm text-gray-900 shadow-sm">
+                    <div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-brand-sand bg-brand-cream px-4 py-3 text-sm text-brand-espresso shadow-sm">
                         ${modeBadge}
                         <p class="leading-relaxed whitespace-pre-line">${escapeAiHtml(msg.text)}</p>
                         ${renderRecommendationCards(msg.recommendedItemIds)}
@@ -687,7 +687,7 @@ export function initAiAssistant({
         const typingHtml = showTyping
             ? `
                 <div class="flex justify-start" aria-label="Assistant is typing">
-                    <div class="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-orange-100 bg-orange-50/70 px-4 py-3">
+                    <div class="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-brand-sand bg-brand-cream px-4 py-3">
                         <span class="ai-typing-dot"></span>
                         <span class="ai-typing-dot"></span>
                         <span class="ai-typing-dot"></span>

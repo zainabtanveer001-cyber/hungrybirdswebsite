@@ -11,7 +11,7 @@
 
     <meta
         name="theme-color"
-        content="#f97316"
+        content="#C62822"
     >
 
     <title>
@@ -21,8 +21,16 @@
     <!-- Favicon -->
     <link
         rel="icon"
-        type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f97316'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-weight='bold' font-size='28' fill='white'%3EHB%3C/text%3E%3C/svg%3E"
+        type="image/png"
+        href="assets/logo.png"
+    >
+
+    <!-- Brand Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
     >
 
     <!-- Optimized Tailwind CSS (local build) -->
@@ -42,7 +50,7 @@
 
 <body
     id="top"
-    class="font-sans text-gray-800 antialiased pb-16 md:pb-0"
+    class="font-sans text-brand-espresso antialiased pb-20 md:pb-0"
 >
 
 
@@ -52,7 +60,7 @@
 
     <div
         id="scrollProgress"
-        class="fixed top-0 left-0 right-0 h-0.5 bg-orange-500 z-[70] scroll-top-progress"
+        class="fixed top-0 left-0 right-0 h-0.5 bg-brand-red z-[70] scroll-top-progress"
     ></div>
 
 
@@ -67,10 +75,10 @@
             top-0
             left-0
             right-0
-            bg-white/80
+            bg-brand-cream/90
             backdrop-blur-xl
             border-b
-            border-white/60
+            border-brand-sand
             shadow-sm
             z-50
             transition-all
@@ -94,6 +102,7 @@
                     justify-between
                     h-16
                     items-center
+                    gap-2
                 "
             >
 
@@ -101,46 +110,45 @@
                 <!-- BRAND -->
 
                 <button
+                    type="button"
                     id="brandBtn"
                     class="
                         flex-shrink-0
                         flex
                         items-center
-                        gap-2
+                        gap-2.5
+                        min-h-[44px]
+                        rounded-2xl
+                        focus:outline-none
+                        focus-visible:ring-4
+                        focus-visible:ring-brand-red/20
                         pressable
                     "
                     aria-label="Go to top"
                 >
 
-                    <span
-                        class="
-                            w-10
-                            h-10
-                            rounded-2xl
-                            bg-orange-500
-                            text-white
-                            grid
-                            place-items-center
-                            shadow-glow
-                        "
+                    <img
+                        src="assets/logo.png"
+                        alt="Hungry Birds rooster chef logo"
+                        class="w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-sm shrink-0"
                     >
 
-                        <i
-                            class="fa-solid fa-utensils"
-                        ></i>
-
-                    </span>
-
-
-                    <span
-                        class="
-                            font-extrabold
-                            text-lg
-                            sm:text-xl
-                            tracking-tight
-                        "
-                    >
-                        Hungry Birds
+                    <span class="flex flex-col text-left leading-none">
+                        <span
+                            class="
+                                font-display
+                                font-extrabold
+                                text-lg
+                                sm:text-xl
+                                tracking-tight
+                                text-brand-espresso
+                            "
+                        >
+                            Hungry Birds
+                        </span>
+                        <span class="hidden sm:block text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-muted mt-0.5">
+                            Karrahi · BBQ · Burgers
+                        </span>
                     </span>
 
                 </button>
@@ -153,44 +161,67 @@
                         flex
                         items-center
                         gap-2
-                        sm:gap-4
+                        sm:gap-3
                     "
                 >
 
-                    <!-- LOGIN -->
-
                     <button
+                        type="button"
                         id="trackOrderBtn"
                         class="
-                            text-xs
-                            bg-blue-50
-                            text-blue-600
+                            inline-flex
+                            items-center
+                            justify-center
+                            gap-1.5
+                            min-h-[44px]
+                            min-w-[44px]
                             px-3
-                            py-1.5
+                            sm:px-3.5
+                            text-xs
+                            sm:text-sm
+                            font-semibold
+                            bg-white
+                            border
+                            border-brand-sand
+                            text-brand-espresso
                             rounded-full
-                            hover:bg-blue-100
+                            hover:border-brand-red/30
+                            hover:bg-brand-redSoft
                             transition-colors
                             pressable
                         "
+                        aria-label="Track Order"
                     >
-                        <i class="fa-solid fa-magnifying-glass sm:mr-1"></i>
+                        <i class="fa-solid fa-receipt text-brand-red" aria-hidden="true"></i>
                         <span class="hidden sm:inline">Track Order</span>
                     </button>
 
                     <button
+                        type="button"
                         id="loginBtn"
                         class="
-                            text-sm
+                            inline-flex
+                            items-center
+                            justify-center
+                            gap-1.5
+                            min-h-[44px]
+                            min-w-[44px]
+                            px-3
+                            sm:px-4
+                            rounded-full
+                            bg-brand-sand/85
+                            hover:bg-brand-sand
+                            text-xs
+                            sm:text-sm
                             font-semibold
-                            text-gray-600
-                            hover:text-orange-500
+                            text-brand-espresso
                             transition-colors
                             pressable
                         "
                         aria-label="Login or Register"
                     >
-                        <i class="fa-solid fa-right-to-bracket sm:hidden"></i>
-                        <span class="hidden sm:inline">Login / Register</span>
+                        <i class="fa-regular fa-user sm:hidden" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Sign In</span>
                     </button>
 
 
@@ -201,7 +232,8 @@
                         class="
                             hidden
                             items-center
-                            gap-3
+                            gap-2
+                            sm:gap-3
                         "
                     >
 
@@ -209,57 +241,71 @@
                             id="userNameDisplay"
                             class="
                                 hidden
-                                sm:inline
+                                md:inline
                                 text-sm
                                 font-semibold
-                                text-gray-700
+                                text-brand-espresso
                             "
                         ></span>
 
 
                         <button
+                            type="button"
                             id="pastOrdersBtn"
                             class="
+                                min-h-[40px]
                                 text-xs
-                                bg-gray-100
+                                font-semibold
+                                bg-white
+                                border
+                                border-brand-sand
+                                text-brand-espresso
                                 px-3
                                 py-1.5
                                 rounded-full
-                                hover:bg-gray-200
+                                hover:bg-brand-sand
                                 transition-colors
                                 pressable
                             "
                         >
-                            Past Orders
+                            Orders
                         </button>
 
                         <button
+                            type="button"
                             id="myCouponsBtn"
                             class="
+                                min-h-[40px]
                                 text-xs
-                                bg-orange-50
-                                text-orange-600
+                                font-semibold
+                                bg-brand-redSoft
+                                text-brand-redDark
+                                border
+                                border-brand-red/15
                                 px-3
                                 py-1.5
                                 rounded-full
-                                hover:bg-orange-100
+                                hover:bg-brand-red
+                                hover:text-white
                                 transition-colors
                                 pressable
                             "
                         >
-                            <i class="fa-solid fa-ticket mr-1"></i>My Coupons
+                            <i class="fa-solid fa-ticket mr-1" aria-hidden="true"></i><span class="hidden sm:inline">Coupons</span><span class="sm:hidden">Deals</span>
                         </button>
 
 
                         <button
+                            type="button"
                             id="logoutBtn"
                             class="
-                                w-9
-                                h-9
+                                w-10
+                                h-10
                                 rounded-full
-                                bg-red-50
-                                text-red-500
-                                hover:bg-red-100
+                                bg-brand-redSoft
+                                text-brand-redDark
+                                hover:bg-brand-red
+                                hover:text-white
                                 transition-colors
                                 pressable
                             "
@@ -271,6 +317,7 @@
                                     fa-solid
                                     fa-right-from-bracket
                                 "
+                                aria-hidden="true"
                             ></i>
 
                         </button>
@@ -281,14 +328,18 @@
                     <!-- CART -->
 
                     <button
+                        type="button"
                         id="cartBtn"
                         class="
                             relative
-                            p-3
-                            bg-orange-500
+                            min-h-[44px]
+                            min-w-[44px]
+                            px-3
+                            sm:px-3.5
+                            bg-brand-red
                             text-white
                             rounded-2xl
-                            hover:bg-orange-600
+                            hover:bg-brand-redDark
                             transition-all
                             duration-200
                             shadow-glow
@@ -300,8 +351,9 @@
                         <i
                             class="
                                 fa-solid
-                                fa-cart-shopping
+                                fa-bag-shopping
                             "
+                            aria-hidden="true"
                         ></i>
 
 
@@ -311,7 +363,7 @@
                                 absolute
                                 -top-1.5
                                 -right-1.5
-                                bg-red-600
+                                bg-brand-espresso
                                 text-white
                                 text-xs
                                 font-bold
@@ -322,7 +374,8 @@
                                 items-center
                                 justify-center
                                 border-2
-                                border-white
+                                border-brand-cream
+                                tabular-nums
                             "
                         >
                             0
@@ -356,29 +409,28 @@
             hidden
         "
     >
-        <div class="relative overflow-hidden rounded-3xl shadow-lg border border-orange-100 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 group">
+        <div class="relative overflow-hidden rounded-3xl shadow-lg border border-brand-sand bg-gradient-to-r from-brand-red via-brand-redDark to-brand-espresso group">
 
             <!-- Slides wrapper -->
-            <div id="bannerSlides" class="relative min-h-[160px] sm:min-h-[220px] md:min-h-[280px] w-full flex transition-transform duration-500 ease-in-out">
+            <div id="bannerSlides" class="relative min-h-[160px] sm:min-h-[220px] md:min-h-[260px] w-full flex transition-transform duration-500 ease-in-out">
                 <!-- Banner slides will be rendered dynamically via JS -->
             </div>
 
             <!-- Carousel Controls -->
             <button
+                type="button"
                 id="bannerPrevBtn"
                 class="
                     absolute
                     left-3
                     top-1/2
                     -translate-y-1/2
-                    w-9
-                    h-9
-                    sm:w-11
-                    sm:h-11
+                    w-10
+                    h-10
                     rounded-full
-                    bg-white/80
+                    bg-white/90
                     hover:bg-white
-                    text-gray-800
+                    text-brand-espresso
                     flex
                     items-center
                     justify-center
@@ -392,24 +444,23 @@
                 "
                 aria-label="Previous Slide"
             >
-                <i class="fa-solid fa-chevron-left text-sm sm:text-base"></i>
+                <i class="fa-solid fa-chevron-left text-sm sm:text-base" aria-hidden="true"></i>
             </button>
 
             <button
+                type="button"
                 id="bannerNextBtn"
                 class="
                     absolute
                     right-3
                     top-1/2
                     -translate-y-1/2
-                    w-9
-                    h-9
-                    sm:w-11
-                    sm:h-11
+                    w-10
+                    h-10
                     rounded-full
-                    bg-white/80
+                    bg-white/90
                     hover:bg-white
-                    text-gray-800
+                    text-brand-espresso
                     flex
                     items-center
                     justify-center
@@ -423,7 +474,7 @@
                 "
                 aria-label="Next Slide"
             >
-                <i class="fa-solid fa-chevron-right text-sm sm:text-base"></i>
+                <i class="fa-solid fa-chevron-right text-sm sm:text-base" aria-hidden="true"></i>
             </button>
 
             <!-- Navigation Dots -->
@@ -438,7 +489,7 @@
                     items-center
                     gap-2
                     z-10
-                    bg-black/20
+                    bg-black/25
                     px-3
                     py-1.5
                     rounded-full
@@ -453,244 +504,260 @@
 
 
     <!-- =========================================================
-         HERO
+         EDITORIAL HERO + STORE INFO BAR
     ========================================================== -->
 
     <header
         class="
             relative
-            pt-28
-            pb-14
+            pt-24
+            sm:pt-28
+            pb-8
+            sm:pb-12
             px-4
             sm:px-6
             lg:px-8
             max-w-7xl
             mx-auto
-            text-center
-            overflow-hidden
         "
     >
 
-        <!-- Grid -->
+        <div class="grid gap-8 lg:grid-cols-12 lg:items-center">
 
-        <div
-            class="
-                hero-grid
-                absolute
-                inset-x-0
-                top-0
-                h-[340px]
-                pointer-events-none
-            "
-        ></div>
-
-
-        <!-- Animated Orbs -->
-
-        <div
-            class="
-                hero-orb
-                w-48
-                h-48
-                bg-orange-200/45
-                -left-20
-                top-16
-                animate-pulse-soft
-            "
-        ></div>
-
-
-        <div
-            class="
-                hero-orb
-                w-56
-                h-56
-                bg-amber-200/35
-                -right-20
-                top-4
-                animate-float
-            "
-        ></div>
-
-
-        <!-- Hero Content -->
-
-        <div
-            class="
-                relative
-                z-10
-                reveal
-                is-visible
-            "
-        >
-
-            <!-- Badge -->
-
-            <div
-                class="
-                    inline-flex
-                    items-center
-                    gap-2
-                    px-4
-                    py-2
-                    rounded-full
-                    bg-white/80
-                    border
-                    border-orange-100
-                    shadow-soft
-                    text-sm
-                    font-semibold
-                    text-orange-600
-                    mb-5
-                "
-            >
-
-                <span
-                    class="
-                        w-2
-                        h-2
-                        rounded-full
-                        bg-orange-500
-                        animate-pulse
-                    "
-                ></span>
-
-                Freshly prepared • Fast delivery
-
-            </div>
-
-
-            <!-- Heading -->
-
-            <h1
-                class="
-                    text-4xl
-                    sm:text-5xl
-                    lg:text-6xl
-                    font-black
-                    text-gray-900
-                    tracking-tight
-                    mb-5
-                    leading-[1.05]
-                "
-            >
-
-                Cravings, Delivered
-
-                <span
-                    class="
-                        text-transparent
-                        bg-clip-text
-                        bg-gradient-to-r
-                        from-orange-500
-                        to-amber-500
-                    "
-                >
-                    Fast.
-                </span>
-
-            </h1>
-
-
-            <!-- Description -->
-
-            <p
-                class="
-                    text-lg
-                    text-gray-500
-                    max-w-2xl
-                    mx-auto
-                    leading-relaxed
-                "
-            >
-                Explore our menu featuring
-                Karahis, Sajji, Burgers,
-                BBQ and more.
-                Choose your favourites
-                and order in seconds.
-            </p>
-
-
-            <!-- Hero Buttons -->
-
-            <div
-                class="
-                    mt-7
-                    flex
-                    flex-wrap
-                    items-center
-                    justify-center
-                    gap-3
-                "
-            >
-
-                <button
-                    id="browseMenuBtn"
-                    class="
-                        px-5
-                        py-3
-                        rounded-2xl
-                        bg-gray-900
-                        text-white
-                        font-bold
-                        shadow-lg
-                        hover:-translate-y-0.5
-                        hover:shadow-xl
-                        transition-all
-                        pressable
-                    "
-                >
-
-                    Browse Menu
-
-                    <i
-                        class="
-                            fa-solid
-                            fa-arrow-down
-                            ml-2
-                            text-orange-400
-                        "
-                    ></i>
-
-                </button>
-
+            <!-- Copy & Upfront Order Controls -->
+            <div class="lg:col-span-6 text-left reveal is-visible">
 
                 <div
                     class="
-                        px-4
-                        py-3
-                        rounded-2xl
-                        bg-white/75
+                        inline-flex
+                        items-center
+                        gap-2
+                        px-3.5
+                        py-1.5
+                        rounded-full
+                        bg-brand-redSoft
                         border
-                        border-gray-200
-                        text-gray-600
-                        text-sm
-                        shadow-soft
+                        border-brand-red/15
+                        text-xs
+                        sm:text-sm
+                        font-bold
+                        text-brand-redDark
+                        mb-4
                     "
                 >
+                    <span class="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true"></span>
+                    <span>Freshly Cooked · Karrahi, BBQ &amp; Burgers</span>
+                </div>
 
-                    <i
+                <h1
+                    class="
+                        font-display
+                        text-3xl
+                        sm:text-5xl
+                        lg:text-[3.35rem]
+                        font-extrabold
+                        text-brand-espresso
+                        tracking-tight
+                        leading-[1.06]
+                        mb-4
+                    "
+                >
+                    Bold Desi Flavors,
+                    <span class="text-brand-red block sm:inline">Flame-Grilled Fresh.</span>
+                </h1>
+
+                <p class="text-base sm:text-lg text-brand-muted leading-relaxed max-w-xl mb-6">
+                    Order sizzling handi Karrahi, charcoal BBQ tikka, crispy Zingers, and chilled drinks straight from our kitchen — hot delivery or quick pickup.
+                </p>
+
+                <!-- Upfront Fulfillment Switcher -->
+                <div class="mb-6 max-w-md">
+                    <div
+                        class="inline-flex p-1 rounded-2xl bg-brand-sand border border-brand-sand w-full sm:w-auto"
+                        role="group"
+                        aria-label="Choose delivery or takeaway"
+                    >
+                        <button
+                            type="button"
+                            id="heroOrderTypeDelivery"
+                            data-action="set-order-type"
+                            data-order-type="DELIVERY"
+                            class="flex-1 sm:flex-initial px-4 py-2.5 min-h-[42px] rounded-xl text-xs sm:text-sm font-bold bg-brand-red text-white shadow-sm transition-colors"
+                            aria-pressed="true"
+                        >
+                            <i class="fa-solid fa-motorcycle mr-1.5" aria-hidden="true"></i>Delivery
+                        </button>
+                        <button
+                            type="button"
+                            id="heroOrderTypeTakeaway"
+                            data-action="set-order-type"
+                            data-order-type="TAKEAWAY"
+                            class="flex-1 sm:flex-initial px-4 py-2.5 min-h-[42px] rounded-xl text-xs sm:text-sm font-bold text-brand-espresso hover:text-brand-red transition-colors"
+                            aria-pressed="false"
+                        >
+                            <i class="fa-solid fa-bag-shopping mr-1.5" aria-hidden="true"></i>Takeaway
+                        </button>
+                    </div>
+                    <p id="heroOrderModeNote" class="text-xs sm:text-sm font-medium text-brand-muted mt-2">
+                        Delivery · Minimum Rs. 500 · Typical ETA 25–35 min
+                    </p>
+                </div>
+
+                <!-- Hero Actions -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <button
+                        type="button"
+                        id="browseMenuBtn"
                         class="
-                            fa-solid
-                            fa-bolt
-                            text-orange-500
-                            mr-1
+                            inline-flex
+                            items-center
+                            justify-center
+                            min-h-[48px]
+                            px-6
+                            py-3
+                            rounded-2xl
+                            bg-brand-red
+                            hover:bg-brand-redDark
+                            text-white
+                            font-bold
+                            text-sm
+                            sm:text-base
+                            shadow-glow
+                            hover:-translate-y-0.5
+                            transition-all
+                            pressable
                         "
-                    ></i>
+                    >
+                        <span>Explore Menu</span>
+                        <i class="fa-solid fa-arrow-down ml-2" aria-hidden="true"></i>
+                    </button>
 
-                    Smooth online ordering
-
+                    <a
+                        href="tel:03257867774"
+                        class="
+                            inline-flex
+                            items-center
+                            justify-center
+                            gap-2
+                            min-h-[48px]
+                            px-5
+                            py-3
+                            rounded-2xl
+                            bg-white
+                            border
+                            border-brand-sand
+                            text-brand-espresso
+                            font-bold
+                            text-sm
+                            sm:text-base
+                            hover:border-brand-red/30
+                            hover:bg-brand-redSoft/50
+                            transition-colors
+                            pressable
+                        "
+                    >
+                        <i class="fa-solid fa-phone text-brand-red" aria-hidden="true"></i>
+                        <span>0325-7867774</span>
+                    </a>
                 </div>
 
             </div>
 
+            <!-- Editorial Feast Photography -->
+            <div class="lg:col-span-6 reveal is-visible">
+                <div class="relative overflow-hidden rounded-3xl border border-brand-sand bg-brand-espresso shadow-2xl">
+                    <img
+                        src="assets/hero-feast.jpg"
+                        alt="Sizzling Pakistani Chicken Karrahi, charcoal BBQ tikka with garlic naan, and crispy double Zinger burger on a warm wood table"
+                        class="w-full h-[230px] sm:h-[320px] lg:h-[390px] object-cover"
+                        decoding="async"
+                    >
+                    <div class="absolute inset-0 bg-gradient-to-t from-brand-espresso/85 via-brand-espresso/20 to-transparent pointer-events-none"></div>
+
+                    <div class="absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-3">
+                        <div class="rounded-2xl bg-brand-cream/95 backdrop-blur-md px-4 py-2.5 shadow-lg border border-white/60">
+                            <div class="flex items-center gap-1.5 text-xs font-extrabold text-brand-espresso">
+                                <span class="text-brand-goldDark" aria-hidden="true">★</span>
+                                <span>4.9 / 5 Google Rated</span>
+                            </div>
+                            <p class="text-[11px] font-medium text-brand-muted mt-0.5">Cooked fresh to order · Zero shortcuts</p>
+                        </div>
+
+                        <div class="hidden sm:inline-flex items-center gap-2 rounded-full bg-brand-espresso/90 text-white px-3.5 py-2 text-xs font-bold border border-white/15 backdrop-blur-sm">
+                            <span class="w-2 h-2 rounded-full bg-brand-gold" aria-hidden="true"></span>
+                            <span>10 Orders = 10% Loyalty Reward</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Store Utility Bar (Replaces Obstructive Mobile Floating Pills) -->
+        <div class="mt-6 sm:mt-8 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            <a
+                href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-white border border-brand-sand px-3 sm:px-3.5 py-3 hover:border-brand-red/30 transition-colors min-h-[52px]"
+            >
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-redSoft text-brand-red">
+                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-xs font-bold text-brand-espresso truncate">Directions</span>
+                    <span class="block text-[11px] text-brand-muted truncate">Google Maps</span>
+                </span>
+            </a>
+
+            <a
+                href="tel:03257867774"
+                class="flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-white border border-brand-sand px-3 sm:px-3.5 py-3 hover:border-brand-red/30 transition-colors min-h-[52px]"
+            >
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-goldSoft text-brand-goldDark">
+                    <i class="fa-solid fa-phone-volume" aria-hidden="true"></i>
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-xs font-bold text-brand-espresso truncate">Call Us</span>
+                    <span class="block text-[11px] text-brand-muted truncate">0325-7867774</span>
+                </span>
+            </a>
+
+            <a
+                href="https://wa.me/923257867774"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-white border border-brand-sand px-3 sm:px-3.5 py-3 hover:border-emerald-300 transition-colors min-h-[52px]"
+            >
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <i class="fa-brands fa-whatsapp text-base" aria-hidden="true"></i>
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-xs font-bold text-brand-espresso truncate">WhatsApp</span>
+                    <span class="block text-[11px] text-brand-muted truncate">Quick help</span>
+                </span>
+            </a>
+
+            <button
+                type="button"
+                data-action="open-ai-chat"
+                class="flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-white border border-brand-sand px-3 sm:px-3.5 py-3 hover:border-brand-red/30 transition-colors min-h-[52px] text-left"
+            >
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-espresso text-white">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-xs font-bold text-brand-espresso truncate">Ask AI</span>
+                    <span class="block text-[11px] text-brand-muted truncate">Meal ideas</span>
+                </span>
+            </button>
         </div>
 
     </header>
 
 
     <!-- =========================================================
-         STICKY CATEGORY BAR
+         STICKY CATEGORY & MENU SEARCH BAR
     ========================================================== -->
 
     <div
@@ -698,11 +765,11 @@
         class="
             sticky
             top-16
-            bg-white/85
+            bg-brand-cream/95
             backdrop-blur-xl
             z-40
             border-y
-            border-gray-200/80
+            border-brand-sand
             shadow-sm
             transition-all
             duration-300
@@ -717,6 +784,13 @@
                 sm:px-6
                 lg:px-8
                 py-3
+                flex
+                flex-col
+                sm:flex-row
+                sm:items-center
+                sm:justify-between
+                gap-2.5
+                sm:gap-4
             "
         >
 
@@ -724,14 +798,55 @@
                 id="categoryContainer"
                 class="
                     flex
-                    space-x-3
+                    items-center
+                    space-x-2.5
                     overflow-x-auto
                     no-scrollbar
+                    flex-1
                 "
             >
 
                 <!-- Categories generated by JavaScript -->
 
+            </div>
+
+            <div class="relative w-full sm:w-64 lg:w-72 shrink-0">
+                <label for="menuSearchInput" class="sr-only">Search menu items</label>
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-brand-muted pointer-events-none" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    id="menuSearchInput"
+                    aria-label="Search menu items"
+                    placeholder="Search karrahi, burgers, BBQ..."
+                    autocomplete="off"
+                    class="
+                        w-full
+                        min-h-[42px]
+                        pl-9
+                        pr-9
+                        py-2
+                        rounded-full
+                        border
+                        border-brand-sand
+                        bg-white
+                        text-sm
+                        text-brand-espresso
+                        placeholder-brand-muted/75
+                        focus:ring-4
+                        focus:ring-brand-red/15
+                        focus:border-brand-red
+                        outline-none
+                        transition-all
+                    "
+                >
+                <button
+                    type="button"
+                    id="menuSearchClearBtn"
+                    aria-label="Clear menu search"
+                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-brand-sand text-brand-espresso hover:bg-brand-red hover:text-white transition-colors grid place-items-center text-xs"
+                >
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
 
         </div>
@@ -774,65 +889,69 @@
 
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
         <div class="grid gap-6 sm:gap-8 lg:grid-cols-2">
-            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-orange-100 bg-white p-4 sm:p-6 lg:p-8 shadow-soft">
-                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-500 mb-2 sm:mb-3">About Us</p>
-                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 mb-3 sm:mb-4">Serving comfort food with heart and flavor.</h2>
-                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-gray-600 mb-4">
+            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-brand-sand bg-white p-5 sm:p-6 lg:p-8 shadow-soft">
+                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-brand-red mb-2 sm:mb-3">About Us</p>
+                <h2 class="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-brand-espresso mb-3 sm:mb-4">Serving comfort food with heart and flavor.</h2>
+                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-brand-muted mb-4">
                     Hungry Birds brings together bold flavors, generous portions, and warm hospitality in one place.
                     From family meals to late-night cravings, we cook every order with the same care we would serve at our own table.
                 </p>
                 <div class="grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-orange-50 p-3 sm:p-4">
-                        <div class="text-xl sm:text-2xl font-black text-orange-600">4.9/5</div>
-                        <div class="text-xs sm:text-sm text-gray-600">Customer rating</div>
+                    <div class="rounded-2xl bg-brand-redSoft p-3 sm:p-4">
+                        <div class="text-xl sm:text-2xl font-black text-brand-red tabular-nums">4.9/5</div>
+                        <div class="text-xs sm:text-sm text-brand-muted">Customer rating</div>
                     </div>
-                    <div class="rounded-2xl bg-amber-50 p-3 sm:p-4">
-                        <div class="text-xl sm:text-2xl font-black text-amber-600">25 min</div>
-                        <div class="text-xs sm:text-sm text-gray-600">Fast delivery</div>
+                    <div class="rounded-2xl bg-brand-goldSoft p-3 sm:p-4">
+                        <div class="text-xl sm:text-2xl font-black text-brand-goldDark tabular-nums">25 min</div>
+                        <div class="text-xs sm:text-sm text-brand-muted">Fast delivery</div>
                     </div>
                     <div class="rounded-2xl bg-emerald-50 p-3 sm:p-4">
-                        <div class="text-xl sm:text-2xl font-black text-emerald-600">Fresh</div>
-                        <div class="text-xs sm:text-sm text-gray-600">Made daily</div>
+                        <div class="text-xl sm:text-2xl font-black text-emerald-700">Fresh</div>
+                        <div class="text-xs sm:text-sm text-brand-muted">Made daily</div>
                     </div>
                 </div>
             </div>
 
-            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-orange-100 bg-gradient-to-br from-orange-500 to-amber-500 p-4 sm:p-6 lg:p-8 text-white shadow-glow">
-                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-100 mb-2 sm:mb-3">Owner’s Message</p>
-                <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black mb-3 sm:mb-4">A taste you can trust.</h2>
-                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-orange-50/95">
+            <div class="rounded-[1.5rem] sm:rounded-[2rem] border border-brand-red/20 bg-gradient-to-br from-brand-red to-brand-espresso p-5 sm:p-6 lg:p-8 text-white shadow-glow">
+                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-brand-goldSoft mb-2 sm:mb-3">Owner’s Message</p>
+                <h2 class="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4">A taste you can trust.</h2>
+                <p class="text-sm sm:text-base leading-7 sm:leading-8 text-brand-cream/90">
                     Thank you for choosing Hungry Birds. Our goal is simple: bring honest, delicious food to your table with the hospitality and quality you deserve. Every recipe is prepared with dedication, and every order is treated like a personal invitation to share a great meal with family and friends.
                 </p>
                 <div class="mt-5 sm:mt-6 flex items-center gap-3">
-                    <div class="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white/20 text-base sm:text-lg font-black">HB</div>
+                    <img
+                        src="assets/logo.png"
+                        alt="Hungry Birds mark"
+                        class="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-brand-cream p-1 object-contain shadow-md shrink-0"
+                    >
                     <div>
-                        <div class="text-sm sm:text-base font-bold">Zeeshan & Rehan Shafiq</div>
-                        <div class="text-xs sm:text-sm text-orange-100">Owners</div>
+                        <div class="text-sm sm:text-base font-bold">Zeeshan &amp; Rehan Shafiq</div>
+                        <div class="text-xs sm:text-sm text-brand-goldSoft/90">Owners · Hungry Birds</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="mt-8 sm:mt-12 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-200 bg-white p-4 sm:p-6 lg:p-8 shadow-soft">
+        <div class="mt-8 sm:mt-12 rounded-[1.5rem] sm:rounded-[2rem] border border-brand-sand bg-white p-5 sm:p-6 lg:p-8 shadow-soft">
             <div class="flex flex-col gap-4 sm:gap-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-orange-500 mb-2">Google Reviews</p>
-                    <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900">Loved by our local community.</h2>
+                    <p class="text-[10px] sm:text-xs font-bold uppercase tracking-[.20em] text-brand-red mb-2">Google Reviews</p>
+                    <h2 class="font-display text-2xl sm:text-3xl lg:text-4xl font-extrabold text-brand-espresso">Loved by our local community.</h2>
                 </div>
                 <a
                     href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-3 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                    class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-goldSoft px-4 py-2.5 text-xs sm:text-sm font-bold text-brand-goldDark hover:bg-brand-gold/25 transition-colors min-h-[44px]"
                 >
-                    <span>★★★★★</span>
+                    <span class="text-brand-gold" aria-hidden="true">★★★★★</span>
                     <span>Open on Google Maps</span>
                 </a>
             </div>
 
             <div class="mt-6 sm:mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <div class="overflow-hidden rounded-[1.25rem] sm:rounded-[1.75rem] border border-gray-200 bg-gradient-to-br from-sky-50 via-white to-orange-50 p-2 sm:p-4">
-                    <div class="overflow-hidden rounded-[1rem] sm:rounded-[1.5rem] border border-orange-100 bg-white/80 shadow-soft">
+                <div class="overflow-hidden rounded-[1.25rem] sm:rounded-[1.75rem] border border-brand-sand bg-brand-cream p-2 sm:p-4">
+                    <div class="overflow-hidden rounded-[1rem] sm:rounded-[1.5rem] border border-brand-sand bg-white shadow-soft">
                         <iframe
                             title="Hungry Birds Restaurant Location Map"
                             src="https://www.google.com/maps?q=31.589676453457848,74.42767159090162&output=embed"
@@ -845,30 +964,30 @@
                 </div>
 
                 <div class="space-y-4 sm:space-y-5">
-                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
-                        <p class="text-sm sm:text-base text-gray-700 leading-7">"The food was fresh, hot, and packed with flavor. The sajji and fries were absolutely worth it!"</p>
+                    <article class="rounded-2xl sm:rounded-3xl border border-brand-sand bg-brand-cream/60 p-4 sm:p-5">
+                        <div class="mb-3 text-brand-gold text-base sm:text-lg" aria-label="5 out of 5 stars">★★★★★</div>
+                        <p class="text-sm sm:text-base text-brand-espresso leading-7">"The food was fresh, hot, and packed with flavor. The sajji and fries were absolutely worth it!"</p>
                         <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
-                            <span class="font-bold text-gray-900">Ayesha K.</span>
-                            <span class="text-gray-500">Google Maps</span>
+                            <span class="font-bold text-brand-espresso">Ayesha K.</span>
+                            <span class="text-brand-muted">Google Maps</span>
                         </div>
                     </article>
 
-                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
-                        <p class="text-sm sm:text-base text-gray-700 leading-7">"Fast delivery and amazing burgers. The service feels warm and professional every time."</p>
+                    <article class="rounded-2xl sm:rounded-3xl border border-brand-sand bg-brand-cream/60 p-4 sm:p-5">
+                        <div class="mb-3 text-brand-gold text-base sm:text-lg" aria-label="5 out of 5 stars">★★★★★</div>
+                        <p class="text-sm sm:text-base text-brand-espresso leading-7">"Fast delivery and amazing burgers. The service feels warm and professional every time."</p>
                         <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
-                            <span class="font-bold text-gray-900">Usman R.</span>
-                            <span class="text-gray-500">Google Maps</span>
+                            <span class="font-bold text-brand-espresso">Usman R.</span>
+                            <span class="text-brand-muted">Google Maps</span>
                         </div>
                     </article>
 
-                    <article class="rounded-2xl sm:rounded-3xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                        <div class="mb-3 text-amber-500 text-base sm:text-lg">★★★★★</div>
-                        <p class="text-sm sm:text-base text-gray-700 leading-7">"Great taste, great value, and a family-friendly vibe. This is now our go-to place for takeaway."</p>
+                    <article class="rounded-2xl sm:rounded-3xl border border-brand-sand bg-brand-cream/60 p-4 sm:p-5">
+                        <div class="mb-3 text-brand-gold text-base sm:text-lg" aria-label="5 out of 5 stars">★★★★★</div>
+                        <p class="text-sm sm:text-base text-brand-espresso leading-7">"Great taste, great value, and a family-friendly vibe. This is now our go-to place for takeaway."</p>
                         <div class="mt-4 sm:mt-5 flex items-center justify-between text-xs sm:text-sm">
-                            <span class="font-bold text-gray-900">Hina S.</span>
-                            <span class="text-gray-500">Google Maps</span>
+                            <span class="font-bold text-brand-espresso">Hina S.</span>
+                            <span class="text-brand-muted">Google Maps</span>
                         </div>
                     </article>
                 </div>
@@ -1098,7 +1217,7 @@
                     <button
                         type="button"
                         id="forgotPasswordBtn"
-                        class="text-xs font-semibold text-orange-600 hover:underline"
+                        class="text-xs font-semibold text-brand-red hover:underline"
                     >
                         Forgot password?
                     </button>
@@ -1112,12 +1231,12 @@
                     id="authSubmitBtn"
                     class="
                         w-full
-                        bg-orange-500
+                        bg-brand-red
                         text-white
                         font-bold
                         py-3.5
                         rounded-2xl
-                        hover:bg-orange-600
+                        hover:bg-brand-redDark
                         transition-all
                         shadow-glow
                         hover:-translate-y-0.5
@@ -1136,7 +1255,7 @@
                 class="
                     text-center
                     text-sm
-                    text-gray-500
+                    text-brand-muted
                     mt-5
                 "
             >
@@ -1151,7 +1270,7 @@
                     href="#"
                     id="toggleAuthMode"
                     class="
-                        text-orange-500
+                        text-brand-red
                         font-semibold
                         hover:underline
                     "
@@ -1179,10 +1298,12 @@
             bg-black/55
             z-[60]
             flex
-            items-center
+            items-end
             justify-center
+            sm:items-stretch
+            sm:justify-end
             backdrop-blur-md
-            p-4
+            p-0
             hidden
         "
         role="dialog"
@@ -1193,13 +1314,16 @@
 
         <div
             class="
-                modal-panel
+                drawer-panel
                 bg-white
-                rounded-3xl
+                rounded-t-3xl
+                sm:rounded-none
+                sm:rounded-l-3xl
                 shadow-2xl
                 w-full
-                max-w-lg
-                max-h-[88vh]
+                sm:max-w-md
+                h-[90vh]
+                sm:h-full
                 flex
                 flex-col
                 overflow-hidden
@@ -1215,7 +1339,7 @@
                     items-center
                     p-6
                     border-b
-                    border-gray-100
+                    border-brand-sand
                 "
             >
 
@@ -1227,7 +1351,7 @@
                             font-bold
                             uppercase
                             tracking-[.18em]
-                            text-orange-500
+                            text-brand-red
                         "
                     >
                         Checkout
@@ -1236,9 +1360,10 @@
                     <h2
                         id="cartModalTitle"
                         class="
+                            font-display
                             text-xl
-                            font-bold
-                            text-gray-800
+                            font-extrabold
+                            text-brand-espresso
                         "
                     >
                         Your Order
@@ -1410,7 +1535,7 @@
                             gap-2
                             p-1
                             rounded-2xl
-                            bg-gray-200/70
+                            bg-brand-sand
                         "
                     >
 
@@ -1423,7 +1548,7 @@
                                 rounded-xl
                                 text-sm
                                 font-semibold
-                                bg-orange-500
+                                bg-brand-red
                                 text-white
                                 shadow-sm
                                 transition-all
@@ -1442,7 +1567,7 @@
                                 rounded-xl
                                 text-sm
                                 font-semibold
-                                text-gray-600
+                                text-brand-muted
                                 transition-all
                             "
                         >
@@ -1466,10 +1591,10 @@
                             py-3
                             rounded-2xl
                             border
-                            border-gray-200
+                            border-brand-sand
                             focus:ring-4
-                            focus:ring-orange-100
-                            focus:border-orange-400
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
                             outline-none
                             transition-all
                         "
@@ -1490,10 +1615,10 @@
                             py-3
                             rounded-2xl
                             border
-                            border-gray-200
+                            border-brand-sand
                             focus:ring-4
-                            focus:ring-orange-100
-                            focus:border-orange-400
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
                             outline-none
                             transition-all
                         "
@@ -1514,18 +1639,18 @@
                             py-3
                             rounded-2xl
                             border
-                            border-gray-200
+                            border-brand-sand
                             focus:ring-4
-                            focus:ring-orange-100
-                            focus:border-orange-400
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
                             outline-none
                             transition-all
                         "
                     >
 
-                    <div id="deliveryInfoNote" class="hidden mt-2 text-xs text-gray-500 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2 space-y-0.5">
-                        <div><i class="fa-solid fa-circle-info text-orange-400 mr-1"></i>Minimum order for delivery: <span class="font-semibold text-gray-700">Rs. 500</span></div>
-                        <div><i class="fa-solid fa-motorcycle text-orange-400 mr-1"></i>Delivery charges vary by location and will be confirmed by our team.</div>
+                    <div id="deliveryInfoNote" class="hidden mt-2 text-xs text-brand-muted bg-brand-redSoft border border-brand-red/15 rounded-xl px-3 py-2 space-y-0.5">
+                        <div><i class="fa-solid fa-circle-info text-brand-red mr-1"></i>Minimum order for delivery: <span class="font-semibold text-brand-espresso">Rs. 500</span></div>
+                        <div><i class="fa-solid fa-motorcycle text-brand-red mr-1"></i>Delivery charges vary by location and will be confirmed by our team.</div>
                     </div>
 
                 </div>
@@ -1540,7 +1665,7 @@
                     p-4
                     sm:p-6
                     border-t
-                    border-gray-100
+                    border-brand-sand
                     bg-white
                 "
             >
@@ -1552,11 +1677,11 @@
                         order-btn
                         w-full
                         h-14
-                        bg-orange-500
+                        bg-brand-red
                         text-white
                         font-bold
                         rounded-2xl
-                        hover:bg-orange-600
+                        hover:bg-brand-redDark
                         transition-all
                         shadow-glow
                         hover:-translate-y-0.5
@@ -1645,17 +1770,18 @@
             <span
                 class="
                     font-bold
-                    text-gray-800
+                    text-brand-espresso
                 "
             >
 
                 <i
                     class="
                         fa-solid
-                        fa-cart-shopping
-                        text-orange-500
+                        fa-bag-shopping
+                        text-brand-red
                         mr-1
                     "
+                    aria-hidden="true"
                 ></i>
 
                 <span
@@ -1709,14 +1835,14 @@
                 id="floatingCheckoutBtn"
                 class="
                     w-full
-                    bg-gray-900
+                    bg-brand-red
                     text-white
                     font-bold
                     py-3
                     rounded-2xl
-                    hover:bg-orange-500
+                    hover:bg-brand-redDark
                     transition-all
-                    shadow-lg
+                    shadow-glow
                     pressable
                 "
             >
@@ -1741,7 +1867,7 @@
             right-4
             sm:right-6
             z-[80]
-            bg-gray-900
+            bg-brand-espresso
             text-white
             px-4
             py-3
@@ -1760,7 +1886,7 @@
                 w-8
                 h-8
                 rounded-xl
-                bg-orange-500
+                bg-brand-red
                 grid
                 place-items-center
                 shrink-0
@@ -1925,8 +2051,8 @@
                     border-gray-100
                 "
             >
-                <h2 id="myCouponsTitle" class="text-xl font-bold text-gray-800">
-                    <i class="fa-solid fa-ticket text-orange-500 mr-2"></i>My Coupons
+                <h2 id="myCouponsTitle" class="font-display text-xl font-extrabold text-brand-espresso">
+                    <i class="fa-solid fa-ticket text-brand-red mr-2" aria-hidden="true"></i>My Coupons
                 </h2>
                 <button
                     id="closeMyCouponsModal"
@@ -2155,6 +2281,106 @@
 
 
     <!-- =========================================================
+         ITEM DETAIL QUICK-VIEW MODAL
+    ========================================================== -->
+
+    <div
+        id="itemDetailModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-end
+            sm:items-center
+            justify-center
+            backdrop-blur-md
+            p-0
+            sm:p-4
+            hidden
+        "
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="itemDetailTitle"
+        aria-hidden="true"
+    >
+        <div
+            class="
+                modal-panel
+                bg-white
+                rounded-t-3xl
+                sm:rounded-3xl
+                shadow-2xl
+                w-full
+                max-w-md
+                overflow-hidden
+            "
+        >
+            <div class="relative bg-brand-cream">
+                <img
+                    id="itemDetailImage"
+                    src="assets/hero-feast.jpg"
+                    alt=""
+                    class="w-full h-56 sm:h-64 object-cover"
+                >
+                <button
+                    type="button"
+                    id="closeItemDetailModalBtn"
+                    class="
+                        absolute
+                        top-4
+                        right-4
+                        w-10
+                        h-10
+                        rounded-full
+                        bg-white/90
+                        text-brand-espresso
+                        hover:bg-white
+                        shadow-md
+                        grid
+                        place-items-center
+                        transition-all
+                        pressable
+                    "
+                    aria-label="Close dish details"
+                >
+                    <i class="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <span
+                        id="itemDetailCategory"
+                        class="inline-block px-3 py-1 rounded-full bg-brand-redSoft text-brand-redDark text-xs font-bold uppercase tracking-wide mb-2"
+                    >
+                        Menu Item
+                    </span>
+                    <h2 id="itemDetailTitle" class="font-display text-2xl font-extrabold text-brand-espresso leading-tight">
+                        Dish Name
+                    </h2>
+                    <p class="text-xs sm:text-sm text-brand-muted mt-1.5">
+                        Prepared fresh to order · Delivery &amp; Takeaway available
+                    </p>
+                </div>
+
+                <div class="pt-3 border-t border-brand-sand flex items-center justify-between gap-4">
+                    <div>
+                        <div class="text-[11px] font-semibold uppercase tracking-wide text-brand-muted">Price</div>
+                        <div id="itemDetailPrice" class="text-2xl font-extrabold text-brand-espresso tabular-nums">
+                            Rs. 0
+                        </div>
+                    </div>
+                    <div id="itemDetailControls"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- =========================================================
          MOBILE BOTTOM NAVIGATION
     ========================================================== -->
 
@@ -2168,10 +2394,10 @@
             right-0
             z-50
             md:hidden
-            bg-white/90
+            bg-brand-cream/95
             backdrop-blur-xl
             border-t
-            border-gray-200/80
+            border-brand-sand
         "
     >
 
@@ -2183,26 +2409,29 @@
         >
 
             <button
+                type="button"
                 id="bottomNavHome"
-                class="bottom-nav-btn active"
+                class="bottom-nav-btn active min-h-[52px]"
             >
-                <i class="fa-solid fa-house"></i>
+                <i class="fa-solid fa-house" aria-hidden="true"></i>
                 <span>Home</span>
             </button>
 
             <button
+                type="button"
                 id="bottomNavMenu"
-                class="bottom-nav-btn"
+                class="bottom-nav-btn min-h-[52px]"
             >
-                <i class="fa-solid fa-utensils"></i>
+                <i class="fa-solid fa-utensils" aria-hidden="true"></i>
                 <span>Menu</span>
             </button>
 
             <button
+                type="button"
                 id="bottomNavCart"
-                class="bottom-nav-btn relative"
+                class="bottom-nav-btn relative min-h-[52px]"
             >
-                <i class="fa-solid fa-cart-shopping"></i>
+                <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
                 <span>Cart</span>
 
                 <span
@@ -2211,7 +2440,7 @@
                         absolute
                         top-1
                         right-1/4
-                        bg-red-600
+                        bg-brand-red
                         text-white
                         text-[10px]
                         font-bold
@@ -2222,7 +2451,8 @@
                         items-center
                         justify-center
                         border-2
-                        border-white
+                        border-brand-cream
+                        tabular-nums
                     "
                 >
                     0
@@ -2234,86 +2464,42 @@
     </nav>
 
 
-    <div class="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div class="flex items-center justify-between rounded-full border border-orange-100 bg-white px-5 py-3 shadow-soft">
-            <div class="flex items-center gap-3">
-                <span class="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-sm text-white shadow-glow">
-                    <i class="fa-solid fa-phone-volume"></i>
-                </span>
-                <div>
-                    <div class="text-[10px] font-bold uppercase tracking-[.22em] text-orange-500">Call us</div>
-                    <div class="text-sm font-black text-gray-900">0325-7867774</div>
-                </div>
-            </div>
-
-            <a
-                href="tel:03257867774"
-                class="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
-            >
-                <i class="fa-solid fa-phone"></i>
-                <span>Call Now</span>
-            </a>
-        </div>
-    </div>
-
-    <footer class="bg-gray-900 text-gray-200">
+    <footer class="bg-brand-espressoDark text-brand-cream">
         <div class="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
             <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div>
                     <div class="flex items-center gap-3">
-                        <span class="grid h-10 w-10 place-items-center rounded-2xl bg-orange-500 text-white shadow-glow">
-                            <i class="fa-solid fa-utensils"></i>
-                        </span>
+                        <img
+                            src="assets/logo.png"
+                            alt="Hungry Birds rooster chef logo"
+                            class="h-12 w-12 rounded-2xl bg-brand-cream p-1 object-contain shadow-md shrink-0"
+                        >
                         <div>
-                            <div class="text-lg font-black text-white">Hungry Birds</div>
-                            <div class="text-sm text-gray-400">Fresh food, fast service</div>
+                            <div class="font-display text-xl font-extrabold text-white">Hungry Birds</div>
+                            <div class="text-sm text-brand-cream/70">Fresh food, fast service · Karrahi, BBQ &amp; Burgers</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-6">
-                    <a href="tel:03257867774" class="inline-flex items-center gap-2 text-orange-300 hover:text-white transition-colors">
-                        <i class="fa-solid fa-phone"></i>
+                    <a href="tel:03257867774" class="inline-flex items-center gap-2 text-brand-gold hover:text-white transition-colors">
+                        <i class="fa-solid fa-phone" aria-hidden="true"></i>
                         <span>0325-7867774</span>
                     </a>
-                    <a href="mailto:contact@hungerbirds.rest" class="inline-flex items-center gap-2 text-orange-300 hover:text-white transition-colors">
-                        <i class="fa-solid fa-envelope"></i>
+                    <a href="mailto:contact@hungerbirds.rest" class="inline-flex items-center gap-2 text-brand-gold hover:text-white transition-colors">
+                        <i class="fa-solid fa-envelope" aria-hidden="true"></i>
                         <span>contact@hungerbirds.rest</span>
                     </a>
-                    <a href="#menuSection" class="text-gray-300 hover:text-white transition-colors">Order Now</a>
-                    <a href="#top" class="text-gray-300 hover:text-white transition-colors">Back to Top</a>
+                    <a href="#menuSection" class="text-brand-cream/80 hover:text-white transition-colors">Order Now</a>
+                    <a href="#top" class="text-brand-cream/80 hover:text-white transition-colors">Back to Top</a>
                 </div>
             </div>
 
-            <div class="mt-8 border-t border-gray-800 pt-6 text-sm text-gray-400">
+            <div class="mt-8 border-t border-white/10 pt-6 text-sm text-brand-cream/60">
                 © 2026 Hungry Birds. All rights reserved.
             </div>
         </div>
     </footer>
-
-    <div class="fixed bottom-20 right-3 z-40 md:hidden">
-        <div class="flex items-center gap-2 rounded-full border border-white/40 bg-white/75 p-1.5 shadow-xl shadow-slate-900/10 backdrop-blur-md">
-            <a
-                href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="floating-action flex items-center gap-2 rounded-full bg-gray-900 px-3 py-2 text-[10px] font-bold text-white transition-all hover:scale-[1.03] active:scale-95"
-                aria-label="Get directions to Hungry Birds"
-            >
-                <i class="fa-solid fa-location-dot"></i>
-                <span>Directions</span>
-            </a>
-
-            <a
-                href="tel:03257867774"
-                class="floating-action flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2.5 text-[10px] font-black text-white shadow-lg shadow-orange-500/40 transition-all hover:scale-[1.03] active:scale-95"
-                aria-label="Call Hungry Birds now"
-            >
-                <i class="fa-solid fa-phone-volume"></i>
-                <span>Call Now</span>
-            </a>
-        </div>
-    </div>
 
 
     <!-- =========================================================
@@ -2335,7 +2521,7 @@
             gap-2
             min-h-[44px]
             rounded-full
-            bg-gray-900
+            bg-brand-espresso
             text-white
             pl-2.5
             pr-4
@@ -2346,10 +2532,10 @@
             shadow-xl
             border
             border-white/20
-            hover:bg-orange-600
+            hover:bg-brand-red
             focus:outline-none
             focus-visible:ring-4
-            focus-visible:ring-orange-300
+            focus-visible:ring-brand-red/30
             transition-colors
             pressable
         "
@@ -2358,7 +2544,7 @@
         aria-controls="aiChatDrawer"
         aria-expanded="false"
     >
-        <span class="grid h-7 w-7 place-items-center rounded-full bg-orange-500 text-white">
+        <span class="grid h-7 w-7 place-items-center rounded-full bg-brand-red text-white">
             <i class="fa-solid fa-wand-magic-sparkles text-xs" aria-hidden="true"></i>
         </span>
         <span>Ask AI</span>
@@ -2405,24 +2591,24 @@
             "
         >
             <!-- Header -->
-            <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 bg-white">
+            <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-brand-sand bg-white">
                 <div class="flex items-center gap-3 min-w-0">
-                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-orange-500 text-white shadow-glow">
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-brand-red text-white shadow-glow">
                         <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                     </span>
                     <div class="min-w-0">
                         <div class="flex items-center gap-1.5 sm:gap-2">
-                            <h2 id="aiChatTitle" class="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">
+                            <h2 id="aiChatTitle" class="font-display text-sm sm:text-base font-extrabold text-brand-espresso whitespace-nowrap">
                                 Hungry Birds AI
                             </h2>
                             <span
                                 id="aiChatStatusBadge"
-                                class="shrink-0 whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-900"
+                                class="shrink-0 whitespace-nowrap rounded-full bg-brand-redSoft px-2 py-0.5 text-[11px] font-bold text-brand-redDark"
                             >
                                 Ready
                             </span>
                         </div>
-                        <p class="text-xs text-gray-600 truncate">
+                        <p class="text-xs text-brand-muted truncate">
                             Menu ideas &amp; quick help
                         </p>
                     </div>
@@ -2432,7 +2618,7 @@
                     <button
                         type="button"
                         id="clearAiChatBtn"
-                        class="rounded-xl px-2.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                        class="rounded-xl px-2.5 py-2 text-xs font-semibold text-brand-muted hover:bg-brand-sand hover:text-brand-espresso transition-colors"
                         aria-label="Clear chat history"
                     >
                         Clear
@@ -2440,7 +2626,7 @@
                     <button
                         type="button"
                         id="closeAiChatBtn"
-                        class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200 transition-colors pressable"
+                        class="w-10 h-10 rounded-full bg-brand-sand/70 text-brand-espresso hover:bg-brand-sand transition-colors pressable"
                         aria-label="Close AI assistant"
                     >
                         <i class="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
@@ -2451,48 +2637,48 @@
             <!-- Messages -->
             <div
                 id="aiChatMessages"
-                class="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50/70"
+                class="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-brand-cream/70"
                 aria-live="polite"
             ></div>
 
             <!-- Starter Chips -->
             <div
                 id="aiStarterChips"
-                class="px-4 py-2.5 border-t border-gray-100 bg-white flex flex-wrap gap-1.5"
+                class="px-4 py-2.5 border-t border-brand-sand bg-white flex flex-wrap gap-1.5"
             >
                 <button
                     type="button"
                     data-ai-prompt="Suggest a meal under Rs. 1,000"
-                    class="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 transition-colors pressable"
+                    class="rounded-full border border-brand-red/20 bg-brand-redSoft px-3 py-1.5 text-xs font-semibold text-brand-redDark hover:bg-brand-red hover:text-white transition-colors pressable"
                 >
                     Meal under Rs. 1,000
                 </button>
                 <button
                     type="button"
                     data-ai-prompt="What are your best burgers?"
-                    class="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 transition-colors pressable"
+                    class="rounded-full border border-brand-red/20 bg-brand-redSoft px-3 py-1.5 text-xs font-semibold text-brand-redDark hover:bg-brand-red hover:text-white transition-colors pressable"
                 >
                     Best burgers?
                 </button>
                 <button
                     type="button"
                     data-ai-prompt="Delivery info and minimum order"
-                    class="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 transition-colors pressable"
+                    class="rounded-full border border-brand-red/20 bg-brand-redSoft px-3 py-1.5 text-xs font-semibold text-brand-redDark hover:bg-brand-red hover:text-white transition-colors pressable"
                 >
                     Delivery info
                 </button>
                 <button
                     type="button"
                     data-ai-prompt="Track my order"
-                    class="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-900 hover:bg-orange-100 transition-colors pressable"
+                    class="rounded-full border border-brand-red/20 bg-brand-redSoft px-3 py-1.5 text-xs font-semibold text-brand-redDark hover:bg-brand-red hover:text-white transition-colors pressable"
                 >
                     Track my order
                 </button>
             </div>
 
             <!-- Input -->
-            <form id="aiChatForm" class="p-3 sm:p-4 border-t border-gray-100 bg-white">
-                <p id="aiChatHelperText" class="hidden text-xs font-medium text-orange-800 mb-2"></p>
+            <form id="aiChatForm" class="p-3 sm:p-4 border-t border-brand-sand bg-white">
+                <p id="aiChatHelperText" class="hidden text-xs font-medium text-brand-redDark mb-2"></p>
                 <div class="flex items-center gap-2">
                     <label for="aiChatInput" class="sr-only">Ask Hungry Birds AI</label>
                     <input
@@ -2501,12 +2687,12 @@
                         maxlength="500"
                         placeholder="Ask about food, budget, or order..."
                         autocomplete="off"
-                        class="flex-1 min-h-[44px] px-4 py-2.5 rounded-2xl border border-gray-200 bg-gray-50 text-sm text-gray-900 placeholder-gray-500 focus:bg-white focus:ring-4 focus:ring-orange-100 focus:border-orange-400 outline-none transition-all"
+                        class="flex-1 min-h-[44px] px-4 py-2.5 rounded-2xl border border-brand-sand bg-brand-cream/60 text-sm text-brand-espresso placeholder-brand-muted/75 focus:bg-white focus:ring-4 focus:ring-brand-red/15 focus:border-brand-red outline-none transition-all"
                     >
                     <button
                         type="submit"
                         id="aiChatSendBtn"
-                        class="min-w-[44px] min-h-[44px] px-4 rounded-2xl bg-gray-900 text-white text-sm font-bold hover:bg-orange-600 disabled:opacity-50 transition-colors pressable"
+                        class="min-w-[44px] min-h-[44px] px-4 rounded-2xl bg-brand-espresso text-white text-sm font-bold hover:bg-brand-red disabled:opacity-50 transition-colors pressable"
                         aria-label="Send message"
                     >
                         <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
