@@ -1,9 +1,9 @@
 # Project Status — Hungry Birds Website
 
-- **Current Phase:** Admin AI Training Tab Built & Verified (Publish `/aiConfig` Rule in Firebase Console to Save Live)
+- **Current Phase:** Category Menu Grouping (4 Items + Show More) Complete — Ready to Push to `origin/main`
 - **Last Updated:** 2026-11-26
-- **Branch:** `main` (pushed to `origin/main`)
-- **Automated Regression (`npm test`):** **PASS (`45/45` tests green)**
+- **Branch:** `main` (local commit ahead of `origin/main` until push approved)
+- **Automated Regression (`npm test`):** **PASS (`46/46` tests green)**
 - **Dependency Audit (`npm audit`):** **PASS (`0 vulnerabilities`)**
 - **CSS Build (`npm run build:css`):** **PASS (`styles.css` compiled cleanly)**
 
@@ -39,6 +39,7 @@
 - **Dependency Audit:** `npm audit`
 
 ## Changelog
+- **2026-11-26 (Grouped 4-Items-Per-Category Menu & Show More/Show Less):** Updated [index.html](../index.html) and [appwebsite.js](../appwebsite.js) (`buildCategoryMenuSections`, `renderMenu`, `filterMenu`, `toggleCategoryExpand`) so `#menuGrid` renders grouped category sections showing up to 4 items per category (2×2 on mobile/tablet, 1×4 on desktop) with inline `"Show more (N more)"` / `"Show less"` toggles in both `"All"` and single-category views; rebuilt [styles.css](../styles.css), bumped SW cache to `hungrybirds-cache-v10` ([sw.js](../sw.js), [sw-register.js](../sw-register.js)), added `TC-052` in [tests/qa.test.mjs](../tests/qa.test.mjs) (`46/46` passing, `0` audit vulnerabilities), and verified live at `1280×800` and `375×812`.
 - **2026-11-26 (Admin AI Training Tab & `/aiConfig/knowledge`):** Added tabbed Admin layout in [admin.html](../admin.html) (`Customers & Orders`, `Coupons & Banners`, `AI Training`), `/aiConfig/{docId}` rules in [firestore.rules](../firestore.rules), admin CRUD in [adminwebsite.js](../adminwebsite.js), storefront `/aiConfig/knowledge` loading in [appwebsite.js](../appwebsite.js), owner-FAQ/knowledge grounding in [ai-assistant.js](../ai-assistant.js) and [api/_lib/gemini-assistant.js](../api/_lib/gemini-assistant.js), bumped SW to `hungrybirds-cache-v9`, and added `TC-050`–`TC-051` (`45/45` tests passing).
 - **2026-11-25 (Vercel `/api/chat` Routing, Evergreen Gemini Aliases & Diversified Fallback):** Removed conflicting `"outputDirectory": "."` from [vercel.json](../vercel.json) so `/api/chat.js` executes cleanly as a Vercel Serverless Function, updated `DEFAULT_MODEL_CHAIN` to `gemini-flash-lite-latest` / `gemini-flash-latest` with `maxOutputTokens: 1024` and plain-text recovery, prevented unmatched fallback queries from repeating the same 3 cheapest items (added greeting, menu overview, price lookup, and family-meal matching in `ai-assistant.js`), and bumped Service Worker to `hungrybirds-cache-v8`.
 - **2026-11-25 (Phases 3–6 — Gemini AI Build, Live QA, Security Audit & Runbook):** Built Milestone 0 (`afecf40` `/api/chat`), Milestone 1 (`6a17e79` `ai-assistant.js` + `sw.js` `v7`), and Milestone 2 (`2d924c3` bottom-left chat drawer + `appwebsite.js` wiring); verified `43/43` unit tests, `0` npm audit vulnerabilities, and live desktop (`1280×800`) + mobile (`375×812`) browser QA; documented free Google AI Studio + Vercel setup in [docs/ops/RUNBOOK.md](./ops/RUNBOOK.md). Stopped before `git push origin main` for owner deploy approval.

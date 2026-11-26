@@ -62,9 +62,13 @@ let pastOrdersCache = [];
 let pastOrdersListener = null;
 let activeOrderListener = null;
 
+const MENU_ITEMS_PER_CATEGORY = 4;
+
 let categories = [{ id: "ALL", name: "All" }];
 let menuItems = [];
 let aiKnowledge = null;
+let activeCategoryId = "ALL";
+const expandedCategoryIds = new Set();
 
 const modalCloseTimers = new WeakMap();
 const modalPreviousFocus = new WeakMap();
@@ -269,25 +273,38 @@ function pricePulse(element) {
 }
 
 // ===== Loading Skeleton =====
-function renderMenuSkeleton(count = 8) {
+function renderMenuSkeleton(count = MENU_ITEMS_PER_CATEGORY) {
     const grid = $("menuGrid");
 
     if (!grid) return;
 
-    grid.innerHTML = Array.from({ length: count }, () => `
-        <div class="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
-            <div class="skeleton h-48"></div>
+    const cardSkeleton = `
+        <div class="bg-white rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+            <div class="skeleton h-32 sm:h-48"></div>
 
-            <div class="p-5 space-y-3">
-                <div class="skeleton h-3 rounded w-1/4"></div>
-                <div class="skeleton h-5 rounded w-3/4"></div>
+            <div class="p-3 sm:p-5 space-y-2.5 sm:space-y-3">
+                <div class="skeleton h-4 sm:h-5 rounded w-3/4"></div>
 
-                <div class="flex justify-between items-center pt-2">
-                    <div class="skeleton h-6 rounded w-24"></div>
-                    <div class="skeleton h-10 rounded-xl w-24"></div>
+                <div class="flex justify-between items-center pt-1 sm:pt-2">
+                    <div class="skeleton h-5 sm:h-6 rounded w-16 sm:w-24"></div>
+                    <div class="skeleton h-8 sm:h-10 rounded-lg sm:rounded-xl w-16 sm:w-24"></div>
                 </div>
             </div>
         </div>
+    `;
+
+    const cardsHTML = Array.from({ length: count }, () => cardSkeleton).join("");
+
+    grid.innerHTML = Array.from({ length: 2 }, () => `
+        <section class="space-y-4">
+            <div class="flex items-center gap-3">
+                <div class="skeleton h-6 sm:h-7 rounded-lg w-36"></div>
+                <div class="skeleton h-5 rounded-full w-16"></div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 lg:gap-6">
+                ${cardsHTML}
+            </div>
+        </section>
     `).join("");
 }
 
@@ -609,14 +626,10 @@ function filterMenu(category, btnElement) {
         "true"
     );
 
-    const filtered =
-        category.id === "ALL"
-            ? menuItems
-            : menuItems.filter(
-                item => item.categoryId === category.id
-            );
+    activeCategoryId = (category && category.id) ? String(category.id) : "ALL";
+    expandedCategoryIds.clear();
 
-    renderMenu(filtered);
+    renderMenu(menuItems, activeCategoryId);
 }
 
 // ===== Menu Rendering =====
@@ -628,20 +641,20 @@ function cardControlsHTML(id) {
 
     if (cartItem) {
         return `
-            <div class="flex items-center gap-1.5 bg-gray-900 rounded-xl px-2 py-1.5 shadow-lg">
+            <div class="flex items-center gap-0.5 sm:gap-1.5 bg-gray-900 rounded-lg sm:rounded-xl px-1 py-1 sm:px-2 sm:py-1.5 shadow-lg">
 
                 <button
                     type="button"
                     data-action="qty"
                     data-id="${safeId}"
                     data-delta="-1"
-                    class="w-7 h-7 rounded-lg text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
+                    class="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg text-xs sm:text-sm text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
                     aria-label="Decrease quantity"
                 >
                     −
                 </button>
 
-                <span class="text-white font-bold w-5 text-center">
+                <span class="text-white font-bold w-4 sm:w-5 text-xs sm:text-sm text-center">
                     ${cartItem.qty}
                 </span>
 
@@ -650,7 +663,7 @@ function cardControlsHTML(id) {
                     data-action="qty"
                     data-id="${safeId}"
                     data-delta="1"
-                    class="w-7 h-7 rounded-lg text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
+                    class="w-6 h-6 sm:w-7 sm:h-7 rounded-md sm:rounded-lg text-xs sm:text-sm text-white hover:bg-white/10 hover:text-orange-400 font-bold transition-colors pressable"
                     aria-label="Increase quantity"
                 >
                     +
@@ -665,7 +678,7 @@ function cardControlsHTML(id) {
             type="button"
             data-action="add"
             data-id="${safeId}"
-            class="bg-gray-900 text-white px-4 py-2.5 rounded-xl hover:bg-orange-500 transition-all shadow-sm hover:shadow-lg pressable"
+            class="bg-gray-900 text-white px-2.5 py-1.5 sm:px-4 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl hover:bg-orange-500 transition-all shadow-sm hover:shadow-lg pressable whitespace-nowrap"
         >
             <i class="fa-solid fa-plus mr-1" aria-hidden="true"></i>
             Add
@@ -683,16 +696,180 @@ function renderCardControls(id) {
     }
 }
 
-function renderMenu(items) {
+function buildCategoryMenuSections(
+    items = [],
+    categoryList = [],
+    selectedCategoryId = "ALL",
+    expandedIds = new Set(),
+    initialLimit = 4
+) {
+    const safeItems = Array.isArray(items) ? items : [];
+    const safeCategories = Array.isArray(categoryList)
+        ? categoryList.filter(cat => cat && cat.id && cat.id !== "ALL")
+        : [];
+    const expandedSet = expandedIds instanceof Set ? expandedIds : new Set(expandedIds || []);
+    const limit = Math.max(1, Number(initialLimit) || 4);
+
+    const grouped = new Map();
+    safeItems.forEach(item => {
+        if (!item) return;
+        const catId = item.categoryId ? String(item.categoryId) : "uncategorized";
+        if (!grouped.has(catId)) {
+            grouped.set(catId, []);
+        }
+        grouped.get(catId).push(item);
+    });
+
+    const categoryNameMap = new Map(
+        safeCategories.map(cat => [String(cat.id), String(cat.name || cat.id)])
+    );
+
+    const orderedEntries = [];
+    if (!selectedCategoryId || selectedCategoryId === "ALL") {
+        const seen = new Set();
+        safeCategories.forEach(cat => {
+            const catId = String(cat.id);
+            const catItems = grouped.get(catId);
+            if (catItems && catItems.length) {
+                orderedEntries.push({
+                    categoryId: catId,
+                    categoryName: String(cat.name || catId),
+                    items: catItems
+                });
+                seen.add(catId);
+            }
+        });
+
+        grouped.forEach((catItems, catId) => {
+            if (seen.has(catId) || !catItems.length) return;
+            const fallbackName = catId === "uncategorized"
+                ? "Other Items"
+                : (categoryNameMap.get(catId) || catId);
+            orderedEntries.push({
+                categoryId: catId,
+                categoryName: fallbackName,
+                items: catItems
+            });
+        });
+    } else {
+        const targetId = String(selectedCategoryId);
+        const catItems = grouped.get(targetId) || [];
+        if (catItems.length) {
+            const targetName = targetId === "uncategorized"
+                ? "Other Items"
+                : (categoryNameMap.get(targetId) || targetId);
+            orderedEntries.push({
+                categoryId: targetId,
+                categoryName: targetName,
+                items: catItems
+            });
+        }
+    }
+
+    return orderedEntries.map(entry => {
+        const isExpanded = expandedSet.has(entry.categoryId);
+        const totalCount = entry.items.length;
+        const hasMore = totalCount > limit;
+        const visibleItems = isExpanded ? entry.items : entry.items.slice(0, limit);
+        const hiddenCount = Math.max(0, totalCount - limit);
+
+        return {
+            categoryId: entry.categoryId,
+            categoryName: entry.categoryName,
+            totalCount,
+            isExpanded,
+            hasMore,
+            visibleItems,
+            hiddenCount
+        };
+    });
+}
+
+function createMenuCard(item, index) {
+    const card = document.createElement("article");
+
+    card.className = `
+        menu-card
+        reveal
+        bg-white
+        rounded-2xl
+        sm:rounded-[2rem]
+        shadow-[0_4px_30px_-12px_rgba(15,23,42,0.1)]
+        overflow-hidden
+        border
+        border-gray-100/60
+        hover:-translate-y-1
+        hover:shadow-[0_12px_40px_-12px_rgba(15,23,42,0.15)]
+        transition-all
+        duration-300
+        ease-out
+    `;
+
+    card.style.transitionDelay =
+        `${Math.min(index * 28, 220)}ms`;
+
+    const imgSrc = item.img || FALLBACK_SVG_IMAGE;
+
+    card.innerHTML = `
+        <div class="relative overflow-hidden bg-gray-50">
+            <img
+                src="${escapeHTML(imgSrc)}"
+                alt="${escapeHTML(item.name)}"
+                loading="lazy"
+                decoding="async"
+                class="w-full h-32 sm:h-48 lg:h-52 object-cover"
+            >
+        </div>
+        <div class="px-3 pt-3 pb-3.5 sm:px-5 sm:pt-4 sm:pb-5">
+            <h3 class="text-[13px] sm:text-[15px] font-semibold text-gray-800 leading-snug tracking-tight min-h-[2.25rem] sm:min-h-[2.4rem] line-clamp-2">
+                ${escapeHTML(item.name)}
+            </h3>
+            <div class="flex flex-wrap justify-between items-center gap-1.5 mt-3 sm:mt-4">
+                <span class="text-[13px] sm:text-lg font-semibold text-gray-900 tracking-tight whitespace-nowrap">
+                    Rs. ${Number(item.price).toLocaleString()}
+                </span>
+                <div id="qtyBox-${escapeHTML(item.id)}">
+                    ${cardControlsHTML(item.id)}
+                </div>
+            </div>
+        </div>
+    `;
+
+    const image = card.querySelector("img");
+
+    image.addEventListener(
+        "error",
+        () => {
+            image.src = FALLBACK_SVG_IMAGE;
+        },
+        { once: true }
+    );
+
+    requestAnimationFrame(() => {
+        card.classList.add("is-visible");
+    });
+
+    return card;
+}
+
+function renderMenu(items = menuItems, selectedCategoryId = activeCategoryId) {
     const grid = $("menuGrid");
 
     if (!grid) return;
 
     grid.innerHTML = "";
 
-    if (!items.length) {
+    const sections = buildCategoryMenuSections(
+        items,
+        categories,
+        selectedCategoryId,
+        expandedCategoryIds,
+        MENU_ITEMS_PER_CATEGORY
+    );
+
+    if (!sections.length) {
         grid.innerHTML = `
-            <div class="col-span-full py-20 text-center reveal is-visible">
+            <div class="py-20 text-center reveal is-visible">
 
                 <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 grid place-items-center mx-auto mb-4">
                     <i class="fa-solid fa-utensils text-xl"></i>
@@ -712,80 +889,81 @@ function renderMenu(items) {
         return;
     }
 
-    items.forEach((item, index) => {
-        const card = document.createElement("article");
+    sections.forEach(section => {
+        const sectionEl = document.createElement("section");
+        sectionEl.className = "menu-category-section space-y-4 sm:space-y-5";
+        sectionEl.dataset.categorySection = section.categoryId;
 
-        card.className = `
-            menu-card
-            reveal
-            bg-white
-            rounded-[2rem]
-            shadow-[0_4px_30px_-12px_rgba(15,23,42,0.1)]
-            overflow-hidden
-            border
-            border-gray-100/60
-            hover:-translate-y-1
-            hover:shadow-[0_12px_40px_-12px_rgba(15,23,42,0.15)]
-            transition-all
-            duration-300
-            ease-out
-        `;
+        const headerEl = document.createElement("div");
+        headerEl.className = "flex items-center justify-between gap-3 border-b border-gray-100 pb-2.5";
 
-        card.style.transitionDelay =
-            `${Math.min(index * 28, 220)}ms`;
+        const headingWrap = document.createElement("div");
+        headingWrap.className = "flex items-center gap-2.5 min-w-0";
 
-        const categoryName =
-            categories.find(
-                c => c.id === item.categoryId
-            )?.name || "";
+        const headingEl = document.createElement("h2");
+        headingEl.className = "text-lg sm:text-2xl font-extrabold text-gray-900 tracking-tight truncate";
+        headingEl.textContent = section.categoryName;
 
-        const imgSrc = item.img || FALLBACK_SVG_IMAGE;
+        const countBadge = document.createElement("span");
+        countBadge.className = "px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-600 text-xs font-bold whitespace-nowrap shrink-0";
+        countBadge.textContent = `${section.totalCount} ${section.totalCount === 1 ? "item" : "items"}`;
 
-        card.innerHTML = `
-            <div class="relative overflow-hidden bg-gray-50">
-                <img
-                    src="${escapeHTML(imgSrc)}"
-                    alt="${escapeHTML(item.name)}"
-                    loading="lazy"
-                    decoding="async"
-                    class="w-full h-52 object-cover"
-                >
-                ${categoryName ? `
-                    <div class="absolute left-4 top-4 px-3 py-1 rounded-full bg-white/80 backdrop-blur-sm text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600">
-                        ${escapeHTML(categoryName)}
-                    </div>
-                ` : ""}
-            </div>
-            <div class="px-5 pt-4 pb-5">
-                <h3 class="text-[15px] font-semibold text-gray-800 leading-snug tracking-tight min-h-[2.4rem]">
-                    ${escapeHTML(item.name)}
-                </h3>
-                <div class="flex justify-between items-center mt-4">
-                    <span class="text-lg font-semibold text-gray-900 tracking-tight">
-                        Rs. ${Number(item.price).toLocaleString()}
-                    </span>
-                    <div id="qtyBox-${escapeHTML(item.id)}">
-                        ${cardControlsHTML(item.id)}
-                    </div>
-                </div>
-            </div>
-        `;
+        headingWrap.appendChild(headingEl);
+        headingWrap.appendChild(countBadge);
+        headerEl.appendChild(headingWrap);
+        sectionEl.appendChild(headerEl);
 
-        const image = card.querySelector("img");
+        const cardsGrid = document.createElement("div");
+        cardsGrid.className = "grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 lg:gap-6";
 
-        image.addEventListener(
-            "error",
-            () => {
-                image.src = FALLBACK_SVG_IMAGE;
-            },
-            { once: true }
-        );
-
-        grid.appendChild(card);
-
-        requestAnimationFrame(() => {
-            card.classList.add("is-visible");
+        section.visibleItems.forEach((item, index) => {
+            cardsGrid.appendChild(createMenuCard(item, index));
         });
+
+        sectionEl.appendChild(cardsGrid);
+
+        if (section.hasMore) {
+            const toggleWrap = document.createElement("div");
+            toggleWrap.className = "pt-2 flex justify-center";
+
+            const toggleBtn = document.createElement("button");
+            toggleBtn.type = "button";
+            toggleBtn.dataset.action = "toggle-category-expand";
+            toggleBtn.dataset.categoryId = section.categoryId;
+            toggleBtn.setAttribute("aria-expanded", String(section.isExpanded));
+            toggleBtn.className = `
+                inline-flex items-center gap-2
+                px-5 py-2.5
+                rounded-full
+                text-xs sm:text-sm
+                font-bold
+                border
+                transition-all
+                duration-200
+                pressable
+                ${section.isExpanded
+                    ? "bg-gray-900 text-white border-gray-900 hover:bg-gray-800 shadow-sm"
+                    : "bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm"
+                }
+            `;
+
+            const labelText = section.isExpanded
+                ? "Show less"
+                : `Show more (${section.hiddenCount} more)`;
+            const iconClass = section.isExpanded
+                ? "fa-chevron-up"
+                : "fa-chevron-down";
+
+            toggleBtn.innerHTML = `
+                <span>${escapeHTML(labelText)}</span>
+                <i class="fa-solid ${iconClass} text-[11px]" aria-hidden="true"></i>
+            `;
+
+            toggleWrap.appendChild(toggleBtn);
+            sectionEl.appendChild(toggleWrap);
+        }
+
+        grid.appendChild(sectionEl);
     });
 }
 
@@ -2083,12 +2261,40 @@ $("orderIdInput")?.addEventListener("keydown", (event) => {
     }
 });
 
+function toggleCategoryExpand(categoryId) {
+    if (!categoryId) return;
+
+    const wasExpanded = expandedCategoryIds.has(categoryId);
+    if (wasExpanded) {
+        expandedCategoryIds.delete(categoryId);
+    } else {
+        expandedCategoryIds.add(categoryId);
+    }
+
+    renderMenu(menuItems, activeCategoryId);
+
+    if (wasExpanded) {
+        const sectionEl = Array.from(
+            document.querySelectorAll(".menu-category-section")
+        ).find(el => el.dataset.categorySection === categoryId);
+
+        if (sectionEl && sectionEl.getBoundingClientRect().top < 140) {
+            sectionEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }
+
+    const updatedBtn = Array.from(
+        document.querySelectorAll('[data-action="toggle-category-expand"]')
+    ).find(el => el.dataset.categoryId === categoryId);
+    updatedBtn?.focus?.({ preventScroll: true });
+}
+
 // Delegated click handlers for dynamically rendered cards, carts, past orders, and coupons
 document.addEventListener("click", (event) => {
     const actionEl = event.target.closest("[data-action]");
     if (!actionEl) return;
 
-    const { action, id, delta, code, slide } = actionEl.dataset;
+    const { action, id, delta, code, slide, categoryId } = actionEl.dataset;
 
     if (action === "add" && id) {
         addToCart(id);
@@ -2096,6 +2302,8 @@ document.addEventListener("click", (event) => {
         changeCartQty(id, Number(delta));
     } else if (action === "remove" && id) {
         removeFromCart(id);
+    } else if (action === "toggle-category-expand" && categoryId) {
+        toggleCategoryExpand(categoryId);
     } else if (action === "repeat-order" && id) {
         repeatOrder(id);
     } else if (action === "copy-coupon" && code) {
@@ -3046,9 +3254,11 @@ async function initMenu() {
         await loadMenuFromFirestore();
 
         updateCartCount();
+        activeCategoryId = "ALL";
+        expandedCategoryIds.clear();
         renderCategories("ALL");
 
-        renderMenu(menuItems);
+        renderMenu(menuItems, "ALL");
 
         if (menuItems.length) {
 

@@ -67,6 +67,7 @@ function loadAppLogic(initialState = {}) {
     'fromFirestoreRestValue',
     'parseFirestoreRestDoc',
     'getOrderTimestampMs',
+    'buildCategoryMenuSections',
   ];
   const snippets = fnNames.map((n) => extractFunctionSource(appJs, n)).join('\n\n');
   const elements = initialState.elements || {};
@@ -81,6 +82,8 @@ function loadAppLogic(initialState = {}) {
     Boolean,
     Array,
     Object,
+    Map,
+    Set,
   };
   vm.createContext(context);
   vm.runInContext(snippets, context);
@@ -561,9 +564,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v9 caches before module boot, sw.js v9 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v10 caches before module boot, sw.js v10 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v9'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v10'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -572,7 +575,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v9 caches before module boo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v9'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v10'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -1067,4 +1070,70 @@ test('US-AI-8 | TC-051: Admin AI knowledge propagates safely to local FAQ answer
   assert.equal(sysText.includes('Open daily 12:00 PM to 2:00 AM'), true);
   assert.equal(sysText.includes('Always greet warmly'), true);
   assert.equal(sysText.includes('comfortable family hall'), true);
+});
+
+test('US-1 | TC-052: Menu groups by category with 4-item cap, inline Show more/Show less toggle, single-category cap, and 2x2/1x4 responsive grid', () => {
+  const { buildCategoryMenuSections } = loadAppLogic();
+
+  const catList = [
+    { id: 'ALL', name: 'All' },
+    { id: 'fast_food', name: 'Fast Food' },
+    { id: 'cold_drinks', name: 'Cold Drinks' },
+    { id: 'empty_cat', name: 'Empty Category' },
+  ];
+
+  const sampleItems = [
+    { id: 'f1', name: 'Zinger 1', price: 450, categoryId: 'fast_food' },
+    { id: 'f2', name: 'Zinger 2', price: 500, categoryId: 'fast_food' },
+    { id: 'f3', name: 'Zinger 3', price: 550, categoryId: 'fast_food' },
+    { id: 'f4', name: 'Zinger 4', price: 600, categoryId: 'fast_food' },
+    { id: 'f5', name: 'Zinger 5', price: 650, categoryId: 'fast_food' },
+    { id: 'f6', name: 'Zinger 6', price: 700, categoryId: 'fast_food' },
+    { id: 'd1', name: 'Pepsi', price: 150, categoryId: 'cold_drinks' },
+    { id: 'd2', name: '7Up', price: 150, categoryId: 'cold_drinks' },
+    { id: 'd3', name: 'Mirinda', price: 150, categoryId: 'cold_drinks' },
+    { id: 'd4', name: 'Water', price: 80, categoryId: 'cold_drinks' },
+    { id: 'u1', name: 'Special Sauce', price: 60, categoryId: 'uncategorized' },
+  ];
+
+  const allCollapsed = buildCategoryMenuSections(sampleItems, catList, 'ALL', new Set(), 4);
+  assert.equal(allCollapsed.length, 3, 'Empty Category should be omitted and uncategorized appended as Other Items');
+  assert.equal(allCollapsed[0].categoryId, 'fast_food');
+  assert.equal(allCollapsed[0].categoryName, 'Fast Food');
+  assert.equal(allCollapsed[0].totalCount, 6);
+  assert.equal(allCollapsed[0].isExpanded, false);
+  assert.equal(allCollapsed[0].hasMore, true);
+  assert.equal(allCollapsed[0].hiddenCount, 2);
+  assert.deepEqual(Array.from(allCollapsed[0].visibleItems.map((i) => i.id)), ['f1', 'f2', 'f3', 'f4']);
+
+  assert.equal(allCollapsed[1].categoryId, 'cold_drinks');
+  assert.equal(allCollapsed[1].totalCount, 4);
+  assert.equal(allCollapsed[1].hasMore, false);
+  assert.equal(allCollapsed[1].hiddenCount, 0);
+  assert.deepEqual(Array.from(allCollapsed[1].visibleItems.map((i) => i.id)), ['d1', 'd2', 'd3', 'd4']);
+
+  assert.equal(allCollapsed[2].categoryId, 'uncategorized');
+  assert.equal(allCollapsed[2].categoryName, 'Other Items');
+  assert.equal(allCollapsed[2].totalCount, 1);
+
+  const fastFoodExpanded = buildCategoryMenuSections(sampleItems, catList, 'ALL', new Set(['fast_food']), 4);
+  assert.equal(fastFoodExpanded[0].isExpanded, true);
+  assert.deepEqual(Array.from(fastFoodExpanded[0].visibleItems.map((i) => i.id)), ['f1', 'f2', 'f3', 'f4', 'f5', 'f6']);
+  assert.equal(fastFoodExpanded[1].isExpanded, false);
+
+  const singleCatCollapsed = buildCategoryMenuSections(sampleItems, catList, 'fast_food', new Set(), 4);
+  assert.equal(singleCatCollapsed.length, 1);
+  assert.equal(singleCatCollapsed[0].categoryId, 'fast_food');
+  assert.equal(singleCatCollapsed[0].hasMore, true);
+  assert.equal(singleCatCollapsed[0].visibleItems.length, 4);
+
+  const emptySingleCat = buildCategoryMenuSections(sampleItems, catList, 'empty_cat', new Set(), 4);
+  assert.equal(emptySingleCat.length, 0);
+
+  assert.equal(/id="menuGrid"[\s\S]{0,120}space-y-10/.test(indexHtml), true, '#menuGrid should stack grouped category sections');
+  assert.equal(appJs.includes('const MENU_ITEMS_PER_CATEGORY = 4;'), true);
+  assert.equal(appJs.includes('grid-cols-2 lg:grid-cols-4'), true, 'Category grids must use 2-col mobile and 4-col desktop layout');
+  assert.equal(appJs.includes('toggle-category-expand'), true);
+  assert.equal(appJs.includes('aria-expanded'), true);
+  assert.equal(/\bonclick=/.test(appJs), false, 'appwebsite.js must remain free of inline onclick handlers');
 });
