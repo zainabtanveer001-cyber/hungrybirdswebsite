@@ -102,7 +102,6 @@ export function buildSanitizedAiPayload({
         }))
         .filter((entry) => entry.text.length > 0);
 
-    const cleanKnowledge = sanitizeAiKnowledge(knowledge);
     const payload = {
         message: String(message ?? "").trim().slice(0, MAX_MESSAGE_LEN),
         history: sanitizedHistory,
@@ -113,9 +112,7 @@ export function buildSanitizedAiPayload({
         },
         orderType: orderType === "TAKEAWAY" ? "TAKEAWAY" : "DELIVERY"
     };
-    if (cleanKnowledge) {
-        payload.knowledge = cleanKnowledge;
-    }
+    void knowledge;
     return payload;
 }
 

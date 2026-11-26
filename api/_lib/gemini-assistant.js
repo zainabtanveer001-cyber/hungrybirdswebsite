@@ -54,9 +54,18 @@ function createRateLimiter({ minuteLimit = 12, hourLimit = 60, maxIps = 1000 } =
 }
 
 function getClientIp(req) {
+  const realIp = req?.headers?.['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+  const vercelXff = req?.headers?.['x-vercel-forwarded-for'];
+  if (typeof vercelXff === 'string' && vercelXff.trim()) {
+    return vercelXff.split(',')[0].trim();
+  }
   const xff = req?.headers?.['x-forwarded-for'];
   if (typeof xff === 'string' && xff.trim()) {
-    return xff.split(',')[0].trim();
+    const parts = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
   }
   return req?.socket?.remoteAddress || 'unknown';
 }
@@ -66,12 +75,17 @@ function isLoopbackHost(hostname) {
 }
 
 function isAllowedOrigin(req) {
-  const origin = req?.headers?.origin;
-  if (!origin) return true;
+  const secFetchSite = String(req?.headers?.['sec-fetch-site'] || '').trim().toLowerCase();
+  if (secFetchSite === 'cross-site') {
+    return false;
+  }
 
-  let originUrl;
+  const originOrReferer = req?.headers?.origin || req?.headers?.referer;
+  if (!originOrReferer) return false;
+
+  let sourceUrl;
   try {
-    originUrl = new URL(origin);
+    sourceUrl = new URL(originOrReferer);
   } catch {
     return false;
   }
@@ -80,11 +94,11 @@ function isAllowedOrigin(req) {
   const host = String(rawHost).split(',')[0].trim().toLowerCase();
   if (!host) return false;
 
-  const originHost = originUrl.host.toLowerCase();
-  if (originHost === host) return true;
+  const sourceHost = sourceUrl.host.toLowerCase();
+  if (sourceHost === host) return true;
 
   const [hostName, hostPort = ''] = host.split(':');
-  if (isLoopbackHost(originUrl.hostname) && isLoopbackHost(hostName) && originUrl.port === hostPort) {
+  if (isLoopbackHost(sourceUrl.hostname) && isLoopbackHost(hostName) && sourceUrl.port === hostPort) {
     return true;
   }
 
@@ -122,6 +136,71 @@ function sanitizeKnowledge(raw) {
   return { openingHours, deliveryInfo, foodNotes, dealsAndUpsells, customInstructions, faqs };
 }
 
+function parseFirestoreRestValue(val) {
+  if (!val || typeof val !== 'object') return undefined;
+  if ('stringValue' in val) return String(val.stringValue);
+  if ('booleanValue' in val) return Boolean(val.booleanValue);
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return Number(val.doubleValue);
+  if ('arrayValue' in val) {
+    const items = (val.arrayValue && val.arrayValue.values) || [];
+    return items.map((entry) => parseFirestoreRestValue(entry));
+  }
+  if ('mapValue' in val) {
+    const out = {};
+    const fields = (val.mapValue && val.mapValue.fields) || {};
+    for (const [k, v] of Object.entries(fields)) {
+      out[k] = parseFirestoreRestValue(v);
+    }
+    return out;
+  }
+  return undefined;
+}
+
+const knowledgeCache = { data: null, expiresAt: 0 };
+
+async function fetchServerAiKnowledge({
+  fetchImpl = globalThis.fetch,
+  projectId = 'hungry-birds-3e16f',
+  ttlMs = 60_000,
+  now = Date.now(),
+} = {}) {
+  if (knowledgeCache.expiresAt > now) {
+    return knowledgeCache.data;
+  }
+  if (typeof fetchImpl !== 'function') {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2500);
+
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/aiConfig/knowledge`;
+    const response = await fetchImpl(url, { method: 'GET', signal: controller.signal });
+    if (!response.ok) {
+      return knowledgeCache.data;
+    }
+    const payload = await response.json();
+    const raw = {};
+    for (const [key, val] of Object.entries(payload?.fields || {})) {
+      raw[key] = parseFirestoreRestValue(val);
+    }
+    const clean = sanitizeKnowledge(raw);
+    knowledgeCache.data = clean;
+    knowledgeCache.expiresAt = now + ttlMs;
+    return clean;
+  } catch {
+    return knowledgeCache.data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function stripControlChars(str) {
+  return String(str ?? '').replace(/[\r\n\t]+/g, ' ').trim();
+}
+
 function validateAndSanitizeInput(rawBody) {
   if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
     return { ok: false, error: 'Request body must be a JSON object.' };
@@ -143,9 +222,9 @@ function validateAndSanitizeInput(rawBody) {
     .slice(0, MAX_MENU_ITEMS)
     .map((item) => {
       if (!item || typeof item !== 'object') return null;
-      const id = String(item.id ?? '').trim().slice(0, 80);
-      const name = String(item.name ?? '').trim().slice(0, 120);
-      const category = String(item.category ?? 'Menu').trim().slice(0, 60) || 'Menu';
+      const id = stripControlChars(item.id ?? '').slice(0, 80);
+      const name = stripControlChars(item.name ?? '').slice(0, 120);
+      const category = stripControlChars(item.category ?? 'Menu').slice(0, 60) || 'Menu';
       const price = Number(item.price);
       if (!id || !name || !Number.isFinite(price) || price < 0) return null;
       if (containsDataImage(id) || containsDataImage(name) || containsDataImage(category)) return null;
@@ -177,8 +256,8 @@ function validateAndSanitizeInput(rawBody) {
     .slice(0, MAX_CART_ITEMS)
     .map((item) => {
       if (!item || typeof item !== 'object') return null;
-      const id = String(item.id ?? '').trim().slice(0, 80);
-      const name = String(item.name ?? '').trim().slice(0, 120);
+      const id = stripControlChars(item.id ?? '').slice(0, 80);
+      const name = stripControlChars(item.name ?? '').slice(0, 120);
       const price = Number(item.price);
       const qty = Math.floor(Number(item.qty));
       if (!name || !Number.isFinite(price) || price < 0 || !Number.isFinite(qty) || qty <= 0) {
@@ -194,8 +273,7 @@ function validateAndSanitizeInput(rawBody) {
       ? rawSubtotal
       : cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
 
-  const knowledge = sanitizeKnowledge(rawBody.knowledge);
-
+  // Never trust client-supplied knowledge/customInstructions for Gemini systemInstruction.
   const value = {
     message,
     history,
@@ -203,9 +281,6 @@ function validateAndSanitizeInput(rawBody) {
     cart: { items: cartItems, subtotal },
     orderType,
   };
-  if (knowledge) {
-    value.knowledge = knowledge;
-  }
 
   return {
     ok: true,
@@ -219,7 +294,7 @@ function getModelChain(envModel) {
   return Array.from(new Set(chain.filter(Boolean)));
 }
 
-function buildGeminiRequestBody(sanitized) {
+function buildGeminiRequestBody(sanitized, serverKnowledge = null) {
   const menuLines = sanitized.menu
     .map((item) => `- [${item.id}] ${item.name} (${item.category}) - Rs. ${item.price}`)
     .join('\n');
@@ -228,9 +303,10 @@ function buildGeminiRequestBody(sanitized) {
     ? sanitized.cart.items.map((item) => `${item.name} x${item.qty} (Rs. ${item.price * item.qty})`).join(', ')
     : 'Empty';
 
+  const trustedKnowledge = sanitizeKnowledge(serverKnowledge);
   const knowledgeParts = [];
-  if (sanitized.knowledge) {
-    const k = sanitized.knowledge;
+  if (trustedKnowledge) {
+    const k = trustedKnowledge;
     if (k.openingHours) knowledgeParts.push(`Opening Hours: ${k.openingHours}`);
     if (k.deliveryInfo) knowledgeParts.push(`Delivery Areas & Fees: ${k.deliveryInfo}`);
     if (k.foodNotes) knowledgeParts.push(`Bestsellers, Spice & Halal Notes: ${k.foodNotes}`);
@@ -375,6 +451,7 @@ function parseAndValidateModelOutput(rawGeminiJson, validMenuIds) {
 async function callGeminiWithFallback({
   apiKey,
   sanitized,
+  serverKnowledge = null,
   envModel,
   fetchImpl = globalThis.fetch,
   timeoutMs = 6500,
@@ -386,7 +463,7 @@ async function callGeminiWithFallback({
 
   const models = getModelChain(envModel);
   const validMenuIds = new Set(sanitized.menu.map((item) => item.id));
-  const requestBody = buildGeminiRequestBody(sanitized);
+  const requestBody = buildGeminiRequestBody(sanitized, serverKnowledge);
   const startedAt = Date.now();
   let sawRateLimit = false;
 
@@ -452,6 +529,8 @@ module.exports = {
   createRateLimiter,
   getClientIp,
   isAllowedOrigin,
+  sanitizeKnowledge,
+  fetchServerAiKnowledge,
   validateAndSanitizeInput,
   getModelChain,
   buildGeminiRequestBody,

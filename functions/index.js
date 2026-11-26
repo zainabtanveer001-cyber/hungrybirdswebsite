@@ -32,6 +32,7 @@ function buildTrackingProjection(orderId, data) {
     "pendingAt",
     "acceptedAt",
     "preparingAt",
+    "outForDeliveryAt",
     "out_for_deliveryAt",
     "completedAt",
     "rejectedAt",
@@ -113,7 +114,8 @@ exports.createVerifiedOrder = onCall({ enforceAppCheck: false }, async (request)
   }
 
   const uid = request.auth.uid;
-  const { items, orderType, customer, couponCode } = request.data || {};
+  const { items, orderType, customer, couponCode, notes } = request.data || {};
+  const cleanNotes = typeof notes === "string" ? notes.trim().slice(0, 250) : "";
 
   if (!["DELIVERY", "TAKEAWAY"].includes(orderType)) {
     throw new HttpsError("invalid-argument", "Invalid order type.");
@@ -216,6 +218,7 @@ exports.createVerifiedOrder = onCall({ enforceAppCheck: false }, async (request)
       couponCode: appliedCode,
       total,
       orderType,
+      ...(cleanNotes ? { notes: cleanNotes } : {}),
       customer: { name, phone, address },
       customerUid: uid,
       status: "PENDING",

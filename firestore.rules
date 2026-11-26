@@ -65,6 +65,48 @@ service cloud.firestore {
             );
         }
 
+        function menuItemPrice(menuData) {
+            return menuData.get('price', menuData.get('sellingPrice', menuData.get('salePrice', menuData.get('customerPrice', -1))));
+        }
+
+        function validFirstOrderItem(items) {
+            return items[0] is map &&
+                items[0].id is string &&
+                items[0].qty is int &&
+                items[0].qty >= 1 &&
+                items[0].qty <= 99 &&
+                exists(/databases/$(database)/documents/menu/$(items[0].id)) &&
+                items[0].price == menuItemPrice(get(/databases/$(database)/documents/menu/$(items[0].id)).data) &&
+                (items.size() > 1 || request.resource.data.subtotal == items[0].price * items[0].qty);
+        }
+
+        function validOrderDiscount(data) {
+            return (
+                (!('couponCode' in data) || data.couponCode == null || data.couponCode == '') &&
+                data.discountAmount == 0
+            ) || (
+                'couponCode' in data &&
+                data.couponCode is string &&
+                data.couponCode.size() > 0 &&
+                exists(/databases/$(database)/documents/coupons/$(data.couponCode)) &&
+                get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.get('active', false) == true &&
+                !(
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.get('singleUse', false) == true &&
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.get('used', false) == true
+                ) &&
+                (
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.get('assignedTo', null) == null ||
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.assignedTo == request.auth.uid
+                ) &&
+                (
+                    !('expiresAt' in get(/databases/$(database)/documents/coupons/$(data.couponCode)).data) ||
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.expiresAt == null ||
+                    get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.expiresAt > request.time
+                ) &&
+                data.discountAmount <= (data.subtotal * get(/databases/$(database)/documents/coupons/$(data.couponCode)).data.get('discountPercent', 0) / 100) + 1
+            );
+        }
+
         // The customer website needs to display the published POS menu.
         // Managers and owners remain responsible for menu/category catalog writes.
         match /menu/{menuId} {
@@ -103,14 +145,21 @@ service cloud.firestore {
                 request.resource.data.items is list &&
                 request.resource.data.items.size() > 0 &&
                 request.resource.data.items.size() <= 50 &&
+                validFirstOrderItem(request.resource.data.items) &&
                 request.resource.data.subtotal is number &&
                 request.resource.data.subtotal > 0 &&
                 (request.resource.data.orderType != 'DELIVERY' || request.resource.data.subtotal >= 500) &&
                 request.resource.data.discountAmount is number &&
                 request.resource.data.discountAmount >= 0 &&
                 request.resource.data.discountAmount <= request.resource.data.subtotal &&
+                validOrderDiscount(request.resource.data) &&
                 request.resource.data.total == request.resource.data.subtotal - request.resource.data.discountAmount &&
+                (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 250)) &&
                 request.resource.data.customer is map &&
+                request.resource.data.customer.get('name', '') is string &&
+                request.resource.data.customer.get('name', '').size() <= 100 &&
+                request.resource.data.customer.get('address', '') is string &&
+                request.resource.data.customer.get('address', '').size() <= 300 &&
                 request.resource.data.customer.phone is string &&
                 request.resource.data.customer.phone.size() >= 7 &&
                 request.resource.data.customer.phone.size() <= 20
@@ -132,7 +181,9 @@ service cloud.firestore {
                 request.resource.data.status == 'PENDING' &&
                 request.resource.data.orderType in ['DELIVERY', 'TAKEAWAY'] &&
                 request.resource.data.total is number &&
-                request.resource.data.total >= 0;
+                request.resource.data.total >= 0 &&
+                existsAfter(/databases/$(database)/documents/onlineOrders/$(orderId)) &&
+                getAfter(/databases/$(database)/documents/onlineOrders/$(orderId)).data.customerUid == request.auth.uid;
 
             allow update: if isStaff();
             allow delete: if isAdmin();

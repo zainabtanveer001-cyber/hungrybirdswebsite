@@ -14,6 +14,16 @@
         content="#C62822"
     >
 
+    <meta
+        name="description"
+        content="Order freshly cooked Pakistani Chicken Karrahi, charcoal BBQ tikka, crispy Zinger burgers, and cold drinks online from Hungry Birds for fast delivery or takeaway."
+    >
+
+    <meta property="og:title" content="Hungry Birds Restaurant - Order Online">
+    <meta property="og:description" content="Bold Desi flavors, flame-grilled fresh. Order Karrahi, BBQ, and Burgers online.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="assets/hero-feast.jpg">
+
     <title>
         Hungry Birds Restaurant - Order Online
     </title>
@@ -2419,6 +2429,166 @@
     </nav>
 
 
+    <!-- =========================================================
+         ORDER CONFIRMATION MODAL
+    ========================================================== -->
+
+    <div
+        id="orderConfirmationModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-center
+            justify-center
+            backdrop-blur-md
+            p-4
+            hidden
+        "
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="orderConfirmTitle"
+        aria-hidden="true"
+    >
+        <div class="modal-panel bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 relative space-y-5 text-center">
+            <button
+                type="button"
+                id="closeOrderConfirmModalBtn"
+                class="absolute top-4 right-4 w-10 h-10 rounded-full bg-brand-sand/70 text-brand-muted hover:text-brand-espresso hover:bg-brand-sand transition-colors grid place-items-center pressable"
+                aria-label="Close order confirmation"
+            >
+                <i class="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
+            </button>
+
+            <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 grid place-items-center mx-auto">
+                <i class="fa-solid fa-circle-check text-2xl" aria-hidden="true"></i>
+            </div>
+
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-red mb-1">Order Confirmed</p>
+                <h2 id="orderConfirmTitle" class="font-display text-2xl font-extrabold text-brand-espresso">
+                    We're Firing Up Your Order!
+                </h2>
+                <p id="confirmedOrderSummary" class="text-sm text-brand-muted mt-1.5">
+                    Save or copy your Order ID below to track live kitchen updates.
+                </p>
+            </div>
+
+            <div class="rounded-2xl border border-brand-sand bg-brand-cream/70 p-4 space-y-2">
+                <div class="text-[11px] font-bold uppercase tracking-wide text-brand-muted">Your Order ID</div>
+                <div id="confirmedOrderId" class="font-mono text-base font-extrabold text-brand-espresso break-all select-all">
+                    -
+                </div>
+                <button
+                    type="button"
+                    data-action="copy-confirmed-order"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-brand-sand text-xs font-bold text-brand-espresso hover:border-brand-red hover:text-brand-red transition-colors pressable"
+                >
+                    <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                    <span>Copy Order ID</span>
+                </button>
+            </div>
+
+            <div class="grid gap-2.5 sm:grid-cols-2">
+                <button
+                    type="button"
+                    data-action="track-confirmed-order"
+                    class="w-full min-h-[46px] px-4 py-2.5 rounded-2xl bg-brand-red hover:bg-brand-redDark text-white text-sm font-bold shadow-glow transition-colors pressable"
+                >
+                    Track Order Live
+                </button>
+                <a
+                    href="https://wa.me/923257867774"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="w-full min-h-[46px] px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors pressable"
+                >
+                    <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+                    <span>WhatsApp</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- =========================================================
+         PRIVACY, TERMS & ALLERGENS MODAL
+    ========================================================== -->
+
+    <div
+        id="legalModal"
+        class="
+            modal-backdrop
+            fixed
+            inset-0
+            bg-black/55
+            z-[60]
+            flex
+            items-center
+            justify-center
+            backdrop-blur-md
+            p-4
+            hidden
+        "
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="legalModalTitle"
+        aria-hidden="true"
+    >
+        <div class="modal-panel bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between p-6 border-b border-brand-sand">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-red">Store Policies</p>
+                    <h2 id="legalModalTitle" class="font-display text-xl font-extrabold text-brand-espresso">
+                        Privacy, Terms &amp; Food Allergens
+                    </h2>
+                </div>
+                <button
+                    type="button"
+                    id="closeLegalModalBtn"
+                    class="w-10 h-10 rounded-full bg-brand-sand/70 text-brand-muted hover:text-brand-espresso hover:bg-brand-sand transition-colors grid place-items-center pressable"
+                    aria-label="Close policies"
+                >
+                    <i class="fa-solid fa-xmark text-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-5 overflow-y-auto text-sm text-brand-muted leading-relaxed">
+                <section>
+                    <h3 class="font-bold text-brand-espresso mb-1">Privacy &amp; Data Use</h3>
+                    <p>
+                        We collect only the name, phone number, delivery address, and email needed to fulfill your orders, track delivery, and apply loyalty rewards. Your cart and latest Order ID stay locally on your device. No payment card data is stored on our servers.
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="font-bold text-brand-espresso mb-1">Account &amp; Data Deletion</h3>
+                    <p>
+                        To request export or permanent deletion of your account and order history at any time, email <a href="mailto:contact@hungerbirds.rest" class="font-semibold text-brand-red underline">contact@hungerbirds.rest</a> or contact us on WhatsApp at <a href="https://wa.me/923257867774" target="_blank" rel="noopener noreferrer" class="font-semibold text-brand-red underline">0325-7867774</a>.
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="font-bold text-brand-espresso mb-1">Terms of Ordering</h3>
+                    <p>
+                        Minimum delivery subtotal is Rs. 500; takeaway orders have no minimum. Delivery charges vary by distance and are confirmed prior to dispatch. Menu availability and prices sync live from our kitchen POS.
+                    </p>
+                </section>
+
+                <section>
+                    <h3 class="font-bold text-brand-espresso mb-1">Food Safety &amp; Allergen Notice</h3>
+                    <p>
+                        Our kitchen prepares items containing dairy, gluten/wheat, eggs, soy, sesame, and spices on shared equipment. If you have a food allergy or dietary requirement, call us at <a href="tel:03257867774" class="font-semibold text-brand-red underline">0325-7867774</a> before placing an order.
+                    </p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+
     <footer class="bg-brand-espressoDark text-brand-cream">
         <div class="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
             <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -2436,7 +2606,7 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-6">
+                <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:flex-wrap sm:gap-6">
                     <a href="tel:03257867774" class="inline-flex items-center gap-2 text-brand-gold hover:text-white transition-colors">
                         <i class="fa-solid fa-phone" aria-hidden="true"></i>
                         <span>0325-7867774</span>
@@ -2445,6 +2615,9 @@
                         <i class="fa-solid fa-envelope" aria-hidden="true"></i>
                         <span>contact@hungerbirds.rest</span>
                     </a>
+                    <button type="button" id="openLegalModalBtn" class="text-left text-brand-cream/80 hover:text-white transition-colors underline underline-offset-4">
+                        Privacy, Terms &amp; Allergens
+                    </button>
                     <a href="#menuSection" class="text-brand-cream/80 hover:text-white transition-colors">Order Now</a>
                     <a href="#top" class="text-brand-cream/80 hover:text-white transition-colors">Back to Top</a>
                 </div>

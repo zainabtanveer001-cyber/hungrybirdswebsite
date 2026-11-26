@@ -61,6 +61,9 @@ let appliedCoupon = null;
 let pastOrdersCache = [];
 let pastOrdersListener = null;
 let activeOrderListener = null;
+let isPlacingOrder = false;
+let lastOrderPlacedAt = 0;
+let lastConfirmedOrderId = "";
 
 const MENU_ITEMS_PER_CATEGORY = 4;
 
@@ -2086,6 +2089,17 @@ const pushOrderToPOS = async (orderData) => {
 
 // ===== Place Order =====
 async function placeOrder() {
+    if (isPlacingOrder) {
+        return;
+    }
+
+    if (lastOrderPlacedAt > 0 && Date.now() - lastOrderPlacedAt < 5000) {
+        showToast(
+            "Order already submitted. Please wait a moment before ordering again.",
+            "fa-clock"
+        );
+        return;
+    }
 
     if (cart.length === 0) {
         showToast(
@@ -2159,6 +2173,7 @@ async function placeOrder() {
     const placeBtn =
         $("placeOrderBtn");
 
+    isPlacingOrder = true;
     placeBtn.disabled = true;
     placeBtn.classList.add("loading");
 
@@ -2197,19 +2212,32 @@ async function placeOrder() {
             currentUser.uid
     };
 
-    const createdOrderId =
-        await pushOrderToPOS(orderData);
-
-    if (createdOrderId) {
-        await consumeCouponAndTrackLoyalty();
+    let createdOrderId = null;
+    try {
+        createdOrderId = await pushOrderToPOS(orderData);
+        if (createdOrderId) {
+            lastOrderPlacedAt = Date.now();
+            await consumeCouponAndTrackLoyalty();
+        }
+    } finally {
+        placeBtn.classList.remove("loading");
+        if (!createdOrderId) {
+            isPlacingOrder = false;
+            placeBtn.disabled = false;
+        }
     }
-
-    placeBtn.classList.remove("loading");
 
     if (!createdOrderId) {
-        placeBtn.disabled = false;
         return;
     }
+
+    lastConfirmedOrderId = createdOrderId;
+    try {
+        localStorage.setItem("hungryBirdsLastOrderId", createdOrderId);
+    } catch {}
+
+    const confirmedTotal = orderData.total;
+    const confirmedMode = currentOrderType === "TAKEAWAY" ? "Takeaway" : "Delivery";
 
     placeBtn.classList.add("success");
 
@@ -2217,6 +2245,7 @@ async function placeOrder() {
 
         placeBtn.classList.remove("success");
         placeBtn.disabled = false;
+        isPlacingOrder = false;
 
         clearCart();
         removeCoupon();
@@ -2238,6 +2267,13 @@ async function placeOrder() {
         $("checkoutPhone").value = "";
         $("checkoutAddress").value = "";
         if ($("checkoutNotes")) $("checkoutNotes").value = "";
+
+        if ($("confirmedOrderId")) $("confirmedOrderId").textContent = createdOrderId;
+        if ($("confirmedOrderSummary")) {
+            $("confirmedOrderSummary").textContent =
+                `${confirmedMode} · Total Rs. ${Number(confirmedTotal).toLocaleString()}. Save or copy your Order ID below to track live updates.`;
+        }
+        openModal($("orderConfirmationModal"));
 
     }, 1400);
 }
@@ -2382,8 +2418,20 @@ function openTrackOrderFlow() {
     openModal($("trackOrderModal"));
     if (currentUser) {
         autoTrackActiveOrder();
+    } else {
+        const input = $("orderIdInput");
+        if (input && !input.value) {
+            try {
+                const savedId = lastConfirmedOrderId || localStorage.getItem("hungryBirdsLastOrderId") || "";
+                if (savedId) input.value = savedId;
+            } catch {}
+        }
     }
 }
+
+$("openLegalModalBtn")?.addEventListener("click", () => openModal($("legalModal")));
+$("closeLegalModalBtn")?.addEventListener("click", () => closeModal($("legalModal")));
+$("closeOrderConfirmModalBtn")?.addEventListener("click", () => closeModal($("orderConfirmationModal")));
 
 $("cartBtn")?.addEventListener("click", openCartFlow);
 
@@ -2499,6 +2547,23 @@ document.addEventListener("click", (event) => {
         removeFromCart(id);
     } else if (action === "open-item-detail" && id) {
         openItemDetailModal(id);
+    } else if (action === "copy-confirmed-order") {
+        const orderIdToCopy = lastConfirmedOrderId || $("confirmedOrderId")?.textContent?.trim() || "";
+        if (orderIdToCopy && orderIdToCopy !== "-") {
+            navigator.clipboard?.writeText(orderIdToCopy)
+                .then(() => showToast("Order ID copied!", "fa-copy"))
+                .catch(() => showToast("Select and copy the Order ID above.", "fa-circle-exclamation"));
+        }
+    } else if (action === "track-confirmed-order") {
+        const targetOrderId = lastConfirmedOrderId || $("confirmedOrderId")?.textContent?.trim() || "";
+        closeModal($("orderConfirmationModal"));
+        openModal($("trackOrderModal"));
+        if (targetOrderId && targetOrderId !== "-") {
+            if ($("orderIdInput")) $("orderIdInput").value = targetOrderId;
+            trackOrderByID(targetOrderId);
+        } else if (currentUser) {
+            autoTrackActiveOrder();
+        }
     } else if (action === "clear-menu-search") {
         clearMenuSearch();
     } else if (action === "set-order-type" && orderType) {
@@ -3274,7 +3339,9 @@ $("applyCouponBtn")?.addEventListener(
     $("pastOrdersModal"),
     $("myCouponsModal"),
     $("trackOrderModal"),
-    $("itemDetailModal")
+    $("itemDetailModal"),
+    $("orderConfirmationModal"),
+    $("legalModal")
 ].forEach(modal => {
 
     if (!modal) return;
@@ -3328,6 +3395,14 @@ document.addEventListener(
 
         if ($("itemDetailModal")?.classList.contains("is-open")) {
             closeItemDetailModal();
+        }
+
+        if ($("orderConfirmationModal")?.classList.contains("is-open")) {
+            closeModal($("orderConfirmationModal"));
+        }
+
+        if ($("legalModal")?.classList.contains("is-open")) {
+            closeModal($("legalModal"));
         }
     }
 );

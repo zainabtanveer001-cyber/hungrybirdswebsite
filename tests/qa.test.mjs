@@ -397,12 +397,13 @@ test('US-4 | TC-016 [BUG-011]: #myCouponsBtn has a single click binding', () => 
 });
 
 test('US-5 | TC-018 [BUG-012]: trackOrderModal supports Escape/backdrop/Enter and pastOrdersModal unsubscribes listener on all closes', () => {
-  assert.equal(/\$\("trackOrderModal"\)[\s\S]{0,60}\]\.forEach/.test(appJs), true);
+  assert.equal(/\$\("trackOrderModal"\)[\s\S]{0,160}\]\.forEach/.test(appJs), true);
   const escIdx = appJs.indexOf('// ===== Escape closes modal =====');
-  const escSection = appJs.slice(escIdx, escIdx + 1200);
+  const escSection = appJs.slice(escIdx, escIdx + 1400);
   assert.equal(escSection.includes('closeTrackOrderModal()'), true);
   assert.equal(escSection.includes('closePastOrdersModal()'), true);
   assert.equal(escSection.includes('closeItemDetailModal()'), true);
+  assert.equal(escSection.includes('closeModal($("legalModal"))'), true);
   assert.equal(/\$\("orderIdInput"\)\?\.addEventListener\(\s*"keydown"/.test(appJs), true);
 });
 
@@ -420,7 +421,7 @@ test('US-1 | TC-004 [BUG-009 / AUD-009]: Banner slides render safe clickable lin
 });
 
 test('US-6 | TC-020 [BUG-015 & BUG-016 / AUD-017]: Modals start hidden with dialog ARIA and sit above mobile bottom nav and AI FAB', () => {
-  for (const modalId of ['authModal', 'cartModal', 'pastOrdersModal', 'myCouponsModal', 'trackOrderModal', 'itemDetailModal']) {
+  for (const modalId of ['authModal', 'cartModal', 'pastOrdersModal', 'myCouponsModal', 'trackOrderModal', 'itemDetailModal', 'orderConfirmationModal', 'legalModal']) {
     const tag = indexHtml.match(new RegExp(`<div\\s+id="${modalId}"[\\s\\S]*?>`))?.[0] || '';
     const classes = (tag.match(/class="([^"]*)"/)?.[1] || '').split(/\s+/);
     assert.equal(classes.includes('hidden'), true, `#${modalId} missing hidden`);
@@ -565,9 +566,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v12 caches before module boot, sw.js v12 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v13 caches before module boot, sw.js v13 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v12'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v13'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -576,7 +577,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v12 caches before module bo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v12'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v13'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -801,13 +802,26 @@ test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key hea
     fetchImpl: fakeFetch,
     env: { GEMINI_API_KEY: 'test-secret-key', GEMINI_MODEL: 'custom-flash-model' },
     rateLimiter: limiter,
+    loadKnowledgeImpl: async () => null,
   });
+
+  // Requests without Origin AND without Referer must be rejected (403 FORBIDDEN_ORIGIN)
+  const noOriginRes = createMockRes();
+  await handler(
+    {
+      method: 'POST',
+      headers: { host: 'hungrybirds.pk', 'x-real-ip': '203.0.113.10' },
+      body: { message: 'Best burger?', menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450 }] },
+    },
+    noOriginRes
+  );
+  assert.equal(noOriginRes.statusCode, 403);
 
   const okRes = createMockRes();
   await handler(
     {
       method: 'POST',
-      headers: { host: 'localhost:4173', origin: 'http://127.0.0.1:4173', 'x-forwarded-for': '203.0.113.10' },
+      headers: { host: 'localhost:4173', origin: 'http://127.0.0.1:4173', 'x-real-ip': '203.0.113.10' },
       body: {
         message: 'Best burger?',
         menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450, category: 'Burgers' }],
@@ -841,7 +855,7 @@ test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key hea
   await handler(
     {
       method: 'POST',
-      headers: { host: 'hungrybirds.pk', 'x-forwarded-for': '203.0.113.10' },
+      headers: { host: 'hungrybirds.pk', origin: 'https://hungrybirds.pk', 'x-real-ip': '203.0.113.10' },
       body: { message: 'Second ask', menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450 }] },
     },
     okRes2
@@ -852,7 +866,7 @@ test('US-AI-5 / US-AI-6 | TC-045: /api/chat calls Gemini with x-goog-api-key hea
   await handler(
     {
       method: 'POST',
-      headers: { host: 'hungrybirds.pk', 'x-forwarded-for': '203.0.113.10' },
+      headers: { host: 'hungrybirds.pk', origin: 'https://hungrybirds.pk', 'x-real-ip': '203.0.113.10' },
       body: { message: 'Third ask', menu: [{ id: 'item_1', name: 'Zinger Burger', price: 450 }] },
     },
     limitedRes
@@ -1062,12 +1076,18 @@ test('US-AI-8 | TC-051: Admin AI knowledge propagates safely to local FAQ answer
     categories: [{ id: 'c1', name: 'Fast Food' }],
     knowledge: rawKnowledge,
   });
-  const serverSanitized = validateAndSanitizeInput(clientPayload);
-  assert.equal(serverSanitized.ok, true);
-  assert.equal(serverSanitized.value.knowledge.extraSecret, undefined);
+  assert.equal(clientPayload.knowledge, undefined, 'Client payload must NOT transmit knowledge overrides to /api/chat');
 
-  const geminiReq = buildGeminiRequestBody(serverSanitized.value);
+  const serverSanitized = validateAndSanitizeInput({
+    ...clientPayload,
+    knowledge: { customInstructions: 'INJECTED PROMPT OVERRIDE' },
+  });
+  assert.equal(serverSanitized.ok, true);
+  assert.equal(serverSanitized.value.knowledge, undefined, 'Server validator must ignore client-submitted knowledge to defeat prompt injection');
+
+  const geminiReq = buildGeminiRequestBody(serverSanitized.value, rawKnowledge);
   const sysText = geminiReq.systemInstruction.parts[0].text;
+  assert.equal(sysText.includes('INJECTED PROMPT OVERRIDE'), false);
   assert.equal(sysText.includes('Open daily 12:00 PM to 2:00 AM'), true);
   assert.equal(sysText.includes('Always greet warmly'), true);
   assert.equal(sysText.includes('comfortable family hall'), true);
@@ -1188,4 +1208,84 @@ test('US-1 / UX-10 | TC-053: Storefront uses mascot logo brand system, hero phot
   assert.deepEqual(Array.from(filterMenuItemsByQuery(sampleItems, 'fast burger', sampleCats).map((i) => i.id)), ['1']);
   assert.deepEqual(Array.from(filterMenuItemsByQuery(sampleItems, 'karrahi', sampleCats).map((i) => i.id)), ['2']);
   assert.equal(filterMenuItemsByQuery(sampleItems, 'pizza', sampleCats).length, 0);
+});
+
+test('US-5 / US-7 / QA-SEC | TC-054: Security hardening blocks origin/IP spoofing, loads AI knowledge server-side, locks Firestore/Storage rules, and adds order confirmation + legal compliance', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const {
+    isAllowedOrigin,
+    getClientIp,
+    fetchServerAiKnowledge,
+  } = require('../api/_lib/gemini-assistant.js');
+
+  // Strict origin/referer + sec-fetch-site checks
+  assert.equal(isAllowedOrigin({ headers: { host: 'hungrybirds.pk' } }), false, 'Missing Origin & Referer must be rejected');
+  assert.equal(
+    isAllowedOrigin({ headers: { host: 'hungrybirds.pk', referer: 'https://hungrybirds.pk/menu' } }),
+    true,
+    'Same-origin Referer should be allowed when Origin omitted'
+  );
+  assert.equal(
+    isAllowedOrigin({ headers: { host: 'hungrybirds.pk', origin: 'https://hungrybirds.pk', 'sec-fetch-site': 'cross-site' } }),
+    false,
+    'sec-fetch-site: cross-site must be rejected'
+  );
+
+  // Trusted IP extraction resists spoofed leftmost X-Forwarded-For values
+  assert.equal(
+    getClientIp({ headers: { 'x-real-ip': '198.51.100.7', 'x-forwarded-for': '1.2.3.4, 198.51.100.7' } }),
+    '198.51.100.7'
+  );
+  assert.equal(
+    getClientIp({ headers: { 'x-vercel-forwarded-for': '198.51.100.8, 10.0.0.1', 'x-forwarded-for': '1.2.3.4' } }),
+    '198.51.100.8'
+  );
+  assert.equal(
+    getClientIp({ headers: { 'x-forwarded-for': '9.9.9.9, 198.51.100.9' } }),
+    '198.51.100.9'
+  );
+
+  // Server-side Firestore REST /aiConfig/knowledge fetch
+  const serverLoaded = await fetchServerAiKnowledge({
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          fields: {
+            openingHours: { stringValue: 'Open 12 PM – 2 AM' },
+            customInstructions: { stringValue: 'Official server rule' },
+            rogueField: { stringValue: 'ignore_me' },
+          },
+        };
+      },
+    }),
+    now: Date.now() + 120_000,
+  });
+  assert.equal(serverLoaded?.openingHours, 'Open 12 PM – 2 AM');
+  assert.equal(serverLoaded?.customInstructions, 'Official server rule');
+  assert.equal(serverLoaded?.rogueField, undefined);
+
+  // Hardened Firestore & Storage rules + Cloud Functions
+  assert.equal(rulesText.includes('function validFirstOrderItem(items)'), true);
+  assert.equal(rulesText.includes('function validOrderDiscount(data)'), true);
+  assert.equal(rulesText.includes('existsAfter(/databases/$(database)/documents/onlineOrders/$(orderId))'), true);
+  assert.equal(rulesText.includes('getAfter(/databases/$(database)/documents/onlineOrders/$(orderId)).data.customerUid == request.auth.uid'), true);
+  assert.equal(storageRulesText.includes("firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', null) in ['OWNER', 'owner', 'admin']"), true);
+  assert.equal(functionsJs.includes('"outForDeliveryAt"'), true);
+  assert.equal(functionsJs.includes('cleanNotes'), true);
+
+  // Persistent Order Confirmation, Legal/Allergen Modal, SEO meta tags, admin noindex, and robots.txt
+  assert.equal(indexHtml.includes('id="orderConfirmationModal"'), true);
+  assert.equal(indexHtml.includes('id="legalModal"'), true);
+  assert.equal(indexHtml.includes('id="openLegalModalBtn"'), true);
+  assert.equal(indexHtml.includes('name="description"'), true);
+  assert.equal(indexHtml.includes('property="og:title"'), true);
+  assert.equal(appJs.includes('isPlacingOrder'), true);
+  assert.equal(appJs.includes('hungryBirdsLastOrderId'), true);
+  assert.equal(adminHtml.includes('<meta name="robots" content="noindex, nofollow">'), true);
+
+  const robotsTxt = readRepoFile('robots.txt');
+  assert.equal(robotsTxt.includes('Disallow: /admin.html'), true);
+  assert.equal(robotsTxt.includes('Disallow: /api/'), true);
 });

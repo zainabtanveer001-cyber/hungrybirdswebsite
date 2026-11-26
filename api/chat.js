@@ -3,6 +3,7 @@ const {
   createRateLimiter,
   getClientIp,
   isAllowedOrigin,
+  fetchServerAiKnowledge,
   validateAndSanitizeInput,
   callGeminiWithFallback,
 } = require('./_lib/gemini-assistant');
@@ -92,6 +93,7 @@ function createChatHandler({
   fetchImpl = globalThis.fetch,
   env = process.env,
   rateLimiter = createRateLimiter(),
+  loadKnowledgeImpl = null,
 } = {}) {
   return async function chatHandler(req, res) {
     if (!req || req.method !== 'POST') {
@@ -153,9 +155,14 @@ function createChatHandler({
       });
     }
 
+    const serverKnowledge = loadKnowledgeImpl
+      ? await Promise.resolve(loadKnowledgeImpl()).catch(() => null)
+      : await fetchServerAiKnowledge({ fetchImpl }).catch(() => null);
+
     const upstream = await callGeminiWithFallback({
       apiKey,
       sanitized: sanitized.value,
+      serverKnowledge,
       envModel: env.GEMINI_MODEL,
       fetchImpl,
     });
