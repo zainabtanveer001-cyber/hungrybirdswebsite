@@ -566,9 +566,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v13 caches before module boot, sw.js v13 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v14 caches before module boot, sw.js v14 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v13'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v14'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -577,7 +577,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v13 caches before module bo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v13'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v14'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -903,6 +903,17 @@ test('US-AI-2 / US-AI-4 / US-AI-6 | TC-046: Zero-quota local FAQ router answers 
   assert.equal(hours?.source, 'local');
   assert.deepEqual(Array.from(hours?.actions || []), ['WHATSAPP']);
   assert.equal(hours?.reply.includes('0325-7867774'), true);
+  assert.equal(hours?.reply.includes('0325-7861114'), true);
+
+  const phone = tryLocalFaqAnswer('What is your phone number?', {});
+  assert.equal(phone?.source, 'local');
+  assert.deepEqual(Array.from(phone?.actions || []), ['WHATSAPP']);
+  assert.equal(phone?.reply.includes('0325-7867774'), true);
+  assert.equal(phone?.reply.includes('0325-7861114'), true);
+
+  assert.equal(indexHtml.includes('href="tel:03257867774"'), true);
+  assert.equal(indexHtml.includes('href="tel:03257861114"'), true);
+  assert.equal(indexHtml.includes('https://wa.me/923257867774'), true);
 
   const loyalty = tryLocalFaqAnswer('How does the 10 orders loyalty coupon work?', {});
   assert.equal(loyalty?.source, 'local');
@@ -1217,7 +1228,19 @@ test('US-5 / US-7 / QA-SEC | TC-054: Security hardening blocks origin/IP spoofin
     isAllowedOrigin,
     getClientIp,
     fetchServerAiKnowledge,
+    buildGeminiRequestBody,
   } = require('../api/_lib/gemini-assistant.js');
+
+  const geminiReqBody = buildGeminiRequestBody({
+    message: 'What is your phone number?',
+    history: [],
+    menu: [{ id: 'm1', name: 'Zinger Burger', price: 450, category: 'Burgers' }],
+    cart: { items: [], subtotal: 0 },
+    orderType: 'DELIVERY',
+  });
+  const sysText = geminiReqBody?.systemInstruction?.parts?.[0]?.text || '';
+  assert.equal(sysText.includes('0325-7867774'), true);
+  assert.equal(sysText.includes('0325-7861114'), true);
 
   // Strict origin/referer + sec-fetch-site checks
   assert.equal(isAllowedOrigin({ headers: { host: 'hungrybirds.pk' } }), false, 'Missing Origin & Referer must be rejected');

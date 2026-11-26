@@ -324,12 +324,12 @@ function buildGeminiRequestBody(sanitized, serverKnowledge = null) {
     'Stay strictly focused on Hungry Birds food, menu recommendations, budget planning, cart help, delivery/takeaway basics, and order tracking.',
     'Politely decline unrelated off-topic questions and offer to help with the Hungry Birds menu.',
     'Reply concisely (2-4 short sentences) and naturally in the same language/script as the customer (English, Roman Urdu, or Urdu script).',
-    'Verified store facts: Minimum delivery order is Rs. 500; every 10 completed online orders earns a 10% off loyalty coupon; WhatsApp/Call support is 0325-7867774; customer can track orders via the Track Order button.',
+    'Verified store facts: Minimum delivery order is Rs. 500; every 10 completed online orders earns a 10% off loyalty coupon; Call support numbers are 0325-7867774 and 0325-7861114; WhatsApp support is 0325-7867774; customer can track orders via the Track Order button.',
     knowledgeParts.length
       ? `RESTAURANT OWNER KNOWLEDGE BASE (authoritative): ${knowledgeParts.join(' ; ')}`
       : 'Do NOT guess opening hours, exact neighborhood delivery charges, allergen/ingredient guarantees, or unresolved complaints. Say plainly you do not have that exact detail and include "WHATSAPP" in actions.',
     knowledgeParts.length
-      ? 'For any detail NOT covered in the menu or owner knowledge base (like unresolved complaints or missing info), do not guess — direct the customer to WhatsApp 0325-7867774 with "WHATSAPP" in actions.'
+      ? 'For any detail NOT covered in the menu or owner knowledge base (like unresolved complaints or missing info), do not guess — direct the customer to WhatsApp 0325-7867774 (or call 0325-7867774 / 0325-7861114) with "WHATSAPP" in actions.'
       : '',
     'ONLY recommend items from the provided MENU list using exact item IDs in recommendedItemIds (max 3). Never invent prices or items.',
     'Allowed actions values: "TRACK_ORDER", "OPEN_CART", "WHATSAPP".',

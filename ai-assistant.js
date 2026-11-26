@@ -310,7 +310,7 @@ export function tryLocalFaqAnswer(
         !(/\b(open cart|open track)\b/i.test(lower))
     ) {
         return {
-            reply: "I don't have exact live branch hours, neighborhood delivery charges, or ingredient/allergen sheets here. Please message our team on WhatsApp or call 0325-7867774 for an exact confirmation.",
+            reply: "I don't have exact live branch hours, neighborhood delivery charges, or ingredient/allergen sheets here. Please message our team on WhatsApp (0325-7867774) or call 0325-7867774 / 0325-7861114 for an exact confirmation.",
             recommendedItemIds: [],
             actions: ["WHATSAPP"],
             source: "local"
@@ -319,7 +319,7 @@ export function tryLocalFaqAnswer(
 
     if (/\b(phone|number|contact|whatsapp|call|address|location|directions|kidhar|kahan hai)\b/i.test(lower) && !isFoodQuery) {
         return {
-            reply: "You can reach Hungry Birds by Call or WhatsApp at 0325-7867774, or open Directions from the page footer/Google Maps card.",
+            reply: "You can reach Hungry Birds by Call at 0325-7867774 or 0325-7861114, message us on WhatsApp at 0325-7867774, or open Directions from the page footer/Google Maps card.",
             recommendedItemIds: [],
             actions: ["WHATSAPP"],
             source: "local"
@@ -404,7 +404,7 @@ export function buildLocalMenuFallback(
 
     if (!catalog.length) {
         return {
-            reply: "Our menu is still loading right now. Tap Retry on the menu grid or reach us on WhatsApp (0325-7867774).",
+            reply: "Our menu is still loading right now. Tap Retry on the menu grid, call 0325-7867774 / 0325-7861114, or reach us on WhatsApp (0325-7867774).",
             recommendedItemIds: [],
             actions: ["WHATSAPP"],
             source: "fallback"
