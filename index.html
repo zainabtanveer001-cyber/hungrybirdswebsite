@@ -510,10 +510,10 @@
     <header
         class="
             relative
-            pt-24
-            sm:pt-28
-            pb-8
-            sm:pb-12
+            pt-20
+            sm:pt-24
+            pb-4
+            sm:pb-6
             px-4
             sm:px-6
             lg:px-8
@@ -566,12 +566,12 @@
                     <span class="text-brand-red block sm:inline">Flame-Grilled Fresh.</span>
                 </h1>
 
-                <p class="text-base sm:text-lg text-brand-muted leading-relaxed max-w-xl mb-6">
+                <p class="text-base sm:text-lg text-brand-muted leading-relaxed max-w-xl mb-4">
                     Order sizzling handi Karrahi, charcoal BBQ tikka, crispy Zingers, and chilled drinks straight from our kitchen — hot delivery or quick pickup.
                 </p>
 
                 <!-- Upfront Fulfillment Switcher -->
-                <div class="mb-6 max-w-md">
+                <div class="mb-5 max-w-md">
                     <div
                         class="inline-flex p-1 rounded-2xl bg-brand-sand border border-brand-sand w-full sm:w-auto"
                         role="group"
@@ -669,7 +669,7 @@
                     <img
                         src="assets/hero-feast.jpg"
                         alt="Sizzling Pakistani Chicken Karrahi, charcoal BBQ tikka with garlic naan, and crispy double Zinger burger on a warm wood table"
-                        class="w-full h-[230px] sm:h-[320px] lg:h-[390px] object-cover"
+                        class="w-full h-[210px] sm:h-[280px] lg:h-[330px] object-cover"
                         decoding="async"
                     >
                     <div class="absolute inset-0 bg-gradient-to-t from-brand-espresso/85 via-brand-espresso/20 to-transparent pointer-events-none"></div>
@@ -694,7 +694,7 @@
         </div>
 
         <!-- Store Utility Bar (Replaces Obstructive Mobile Floating Pills) -->
-        <div class="mt-6 sm:mt-8 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div class="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             <a
                 href="https://maps.app.goo.gl/xom5dSf9GEnDou8T8"
                 target="_blank"
@@ -1045,7 +1045,7 @@
                     w-32
                     h-32
                     rounded-full
-                    bg-orange-200/30
+                    bg-brand-red/10
                     blur-2xl
                     pointer-events-none
                 "
@@ -1072,7 +1072,7 @@
                             font-bold
                             uppercase
                             tracking-[.18em]
-                            text-orange-500
+                            text-brand-red
                             mb-1
                         "
                     >
@@ -1082,9 +1082,10 @@
                     <h2
                         id="authTitle"
                         class="
+                            font-display
                             text-2xl
-                            font-bold
-                            text-gray-800
+                            font-extrabold
+                            text-brand-espresso
                         "
                     >
                         Welcome Back
@@ -1099,10 +1100,10 @@
                         w-10
                         h-10
                         rounded-full
-                        bg-gray-100
-                        text-gray-400
-                        hover:text-gray-700
-                        hover:bg-gray-200
+                        bg-brand-sand/70
+                        text-brand-muted
+                        hover:text-brand-espresso
+                        hover:bg-brand-sand
                         transition-all
                         pressable
                     "
@@ -1137,7 +1138,7 @@
                         class="
                             text-xs
                             font-semibold
-                            text-gray-500
+                            text-brand-muted
                             mb-1.5
                             block
                         "
@@ -1157,12 +1158,12 @@
                             py-3.5
                             rounded-2xl
                             border
-                            border-gray-200
-                            bg-gray-50/70
+                            border-brand-sand
+                            bg-brand-cream/50
                             focus:bg-white
                             focus:ring-4
-                            focus:ring-orange-100
-                            focus:border-orange-400
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
                             outline-none
                             transition-all
                         "
@@ -1179,7 +1180,7 @@
                         class="
                             text-xs
                             font-semibold
-                            text-gray-500
+                            text-brand-muted
                             mb-1.5
                             block
                         "
@@ -1200,12 +1201,12 @@
                             py-3.5
                             rounded-2xl
                             border
-                            border-gray-200
-                            bg-gray-50/70
+                            border-brand-sand
+                            bg-brand-cream/50
                             focus:bg-white
                             focus:ring-4
-                            focus:ring-orange-100
-                            focus:border-orange-400
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
                             outline-none
                             transition-all
                         "
@@ -1451,11 +1452,12 @@
                                 py-2.5
                                 rounded-2xl
                                 border
-                                border-gray-200
+                                border-brand-sand
+                                bg-white
                                 uppercase
                                 focus:ring-4
-                                focus:ring-orange-100
-                                focus:border-orange-400
+                                focus:ring-brand-red/15
+                                focus:border-brand-red
                                 outline-none
                                 transition-all
                             "
@@ -1468,11 +1470,11 @@
                                 px-4
                                 py-2.5
                                 rounded-2xl
-                                bg-gray-900
+                                bg-brand-espresso
                                 text-white
                                 font-bold
                                 text-sm
-                                hover:bg-orange-500
+                                hover:bg-brand-red
                                 transition-colors
                                 pressable
                             "
@@ -1653,6 +1655,32 @@
                         <div><i class="fa-solid fa-motorcycle text-brand-red mr-1"></i>Delivery charges vary by location and will be confirmed by our team.</div>
                     </div>
 
+                    <textarea
+                        id="checkoutNotes"
+                        rows="2"
+                        maxlength="250"
+                        aria-label="Special kitchen instructions"
+                        placeholder="Special instructions (optional — e.g. less spicy, extra raita)"
+                        class="
+                            w-full
+                            px-4
+                            py-2.5
+                            rounded-2xl
+                            border
+                            border-brand-sand
+                            bg-white
+                            text-sm
+                            text-brand-espresso
+                            placeholder-brand-muted/75
+                            focus:ring-4
+                            focus:ring-brand-red/15
+                            focus:border-brand-red
+                            outline-none
+                            transition-all
+                            resize-none
+                        "
+                    ></textarea>
+
                 </div>
 
             </div>
@@ -1725,7 +1753,7 @@
 
 
     <!-- =========================================================
-         FLOATING CART
+         FLOATING CHECKOUT PILL (DESKTOP)
     ========================================================== -->
 
     <div
@@ -1733,124 +1761,50 @@
         class="
             floating-cart
             fixed
-            bottom-5
-            right-4
-            sm:right-6
+            bottom-6
+            right-6
             z-40
-            w-[calc(100vw-2rem)]
-            sm:w-80
-            max-w-sm
-            bg-white/95
-            backdrop-blur-xl
-            rounded-3xl
+            inline-flex
+            items-center
+            gap-3
+            rounded-full
+            bg-brand-espresso
+            text-white
+            pl-4
+            pr-2
+            py-2
             shadow-2xl
             border
-            border-gray-100
-            flex
-            flex-col
-            max-h-[70vh]
-            overflow-hidden
+            border-white/15
         "
     >
+        <div class="flex items-center gap-2 text-xs sm:text-sm font-bold whitespace-nowrap">
+            <i class="fa-solid fa-bag-shopping text-brand-gold" aria-hidden="true"></i>
+            <span><span id="floatingCartCount" class="tabular-nums">0</span> items</span>
+            <span class="text-white/40" aria-hidden="true">·</span>
+            <span id="floatingCartTotal" class="font-extrabold tabular-nums">Rs. 0</span>
+        </div>
 
-        <!-- Cart Header -->
-
-        <div
+        <button
+            type="button"
+            id="floatingCheckoutBtn"
             class="
-                flex
-                justify-between
-                items-center
                 px-4
-                py-3
-                border-b
-                border-gray-100
+                py-2
+                rounded-full
+                bg-brand-red
+                hover:bg-brand-redDark
+                text-white
+                text-xs
+                sm:text-sm
+                font-bold
+                transition-colors
+                pressable
+                whitespace-nowrap
             "
         >
-
-            <span
-                class="
-                    font-bold
-                    text-brand-espresso
-                "
-            >
-
-                <i
-                    class="
-                        fa-solid
-                        fa-bag-shopping
-                        text-brand-red
-                        mr-1
-                    "
-                    aria-hidden="true"
-                ></i>
-
-                <span
-                    id="floatingCartCount"
-                >
-                    0
-                </span>
-
-                items
-
-            </span>
-
-
-            <span
-                id="floatingCartTotal"
-                class="
-                    font-black
-                    text-gray-900
-                "
-            >
-                Rs. 0
-            </span>
-
-        </div>
-
-
-        <!-- Cart Items -->
-
-        <div
-            id="floatingCartItems"
-            class="
-                p-3
-                space-y-2
-                overflow-y-auto
-                flex-1
-            "
-        ></div>
-
-
-        <!-- Checkout Button -->
-
-        <div
-            class="
-                p-3
-                border-t
-                border-gray-100
-            "
-        >
-
-            <button
-                id="floatingCheckoutBtn"
-                class="
-                    w-full
-                    bg-brand-red
-                    text-white
-                    font-bold
-                    py-3
-                    rounded-2xl
-                    hover:bg-brand-redDark
-                    transition-all
-                    shadow-glow
-                    pressable
-                "
-            >
-                Checkout
-            </button>
-
-        </div>
-
+            Checkout <i class="fa-solid fa-arrow-right ml-1 text-[11px]" aria-hidden="true"></i>
+        </button>
     </div>
 
 
@@ -2147,7 +2101,7 @@
                             font-bold
                             uppercase
                             tracking-[.18em]
-                            text-orange-500
+                            text-brand-red
                         "
                     >
                         Order Tracking
@@ -2156,9 +2110,10 @@
                     <h2
                         id="trackOrderTitle"
                         class="
+                            font-display
                             text-xl
-                            font-bold
-                            text-gray-800
+                            font-extrabold
+                            text-brand-espresso
                         "
                     >
                         Track Your Order
@@ -2172,10 +2127,10 @@
                         w-10
                         h-10
                         rounded-full
-                        bg-gray-100
-                        text-gray-500
-                        hover:text-gray-700
-                        hover:bg-gray-200
+                        bg-brand-sand/70
+                        text-brand-muted
+                        hover:text-brand-espresso
+                        hover:bg-brand-sand
                         transition-all
                         pressable
                     "
@@ -2187,9 +2142,9 @@
             </div>
 
             <!-- Search Input -->
-            <div id="trackOrderIdSection" class="p-6 border-b border-gray-100">
+            <div id="trackOrderIdSection" class="p-6 border-b border-brand-sand">
                 <label class="block">
-                    <span class="text-xs font-semibold text-gray-500 mb-2 block">
+                    <span class="text-xs font-semibold text-brand-muted mb-2 block">
                         Enter Order ID
                     </span>
                     <div class="flex gap-2">
@@ -2203,12 +2158,12 @@
                                 py-3
                                 rounded-2xl
                                 border
-                                border-gray-200
-                                bg-gray-50/70
+                                border-brand-sand
+                                bg-brand-cream/50
                                 focus:bg-white
                                 focus:ring-4
-                                focus:ring-orange-100
-                                focus:border-orange-400
+                                focus:ring-brand-red/15
+                                focus:border-brand-red
                                 outline-none
                                 transition-all
                                 font-mono
@@ -2221,10 +2176,10 @@
                                 px-6
                                 py-3
                                 rounded-2xl
-                                bg-orange-500
+                                bg-brand-red
                                 text-white
                                 font-bold
-                                hover:bg-orange-600
+                                hover:bg-brand-redDark
                                 transition-all
                                 shadow-glow
                                 pressable
@@ -2361,7 +2316,7 @@
                     <h2 id="itemDetailTitle" class="font-display text-2xl font-extrabold text-brand-espresso leading-tight">
                         Dish Name
                     </h2>
-                    <p class="text-xs sm:text-sm text-brand-muted mt-1.5">
+                    <p id="itemDetailDescription" class="text-xs sm:text-sm text-brand-muted mt-1.5">
                         Prepared fresh to order · Delivery &amp; Takeaway available
                     </p>
                 </div>
@@ -2503,8 +2458,45 @@
 
 
     <!-- =========================================================
-         GEMINI AI CUSTOMER ASSISTANT (LAUNCHER + DRAWER)
+         GEMINI AI CUSTOMER ASSISTANT & MOBILE STICKY CART BAR
     ========================================================== -->
+
+    <button
+        type="button"
+        id="mobileCartBar"
+        class="
+            fixed
+            bottom-20
+            left-[68px]
+            right-3
+            z-40
+            md:hidden
+            hidden
+            min-h-[44px]
+            px-4
+            py-2.5
+            rounded-full
+            bg-brand-red
+            hover:bg-brand-redDark
+            text-white
+            text-xs
+            font-bold
+            shadow-xl
+            flex
+            items-center
+            justify-between
+            gap-2
+            transition-colors
+            pressable
+        "
+        aria-label="Open cart drawer"
+    >
+        <span class="flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+            <span>View Cart (<span id="mobileCartBarCount" class="tabular-nums">0</span>)</span>
+        </span>
+        <span id="mobileCartBarTotal" class="font-extrabold tabular-nums whitespace-nowrap">Rs. 0</span>
+    </button>
 
     <button
         type="button"
@@ -2518,14 +2510,21 @@
             z-40
             inline-flex
             items-center
-            gap-2
+            justify-center
+            sm:gap-2
+            w-11
+            h-11
+            sm:w-auto
+            sm:h-auto
             min-h-[44px]
+            min-w-[44px]
             rounded-full
             bg-brand-espresso
             text-white
-            pl-2.5
-            pr-4
-            py-2
+            p-0
+            sm:pl-2.5
+            sm:pr-4
+            sm:py-2
             text-xs
             sm:text-sm
             font-bold
@@ -2544,10 +2543,10 @@
         aria-controls="aiChatDrawer"
         aria-expanded="false"
     >
-        <span class="grid h-7 w-7 place-items-center rounded-full bg-brand-red text-white">
+        <span class="grid h-8 w-8 sm:h-7 sm:w-7 place-items-center rounded-full bg-brand-red text-white shrink-0">
             <i class="fa-solid fa-wand-magic-sparkles text-xs" aria-hidden="true"></i>
         </span>
-        <span>Ask AI</span>
+        <span class="hidden sm:inline">Ask AI</span>
     </button>
 
     <div

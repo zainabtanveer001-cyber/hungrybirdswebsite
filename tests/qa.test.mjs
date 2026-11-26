@@ -565,9 +565,9 @@ test('US-7 | TC-040: firestore.rules preserves all 16 POS collections, uppercase
   assert.equal(rulesText.includes("orderId == 'setting_ownerPinHash' ? isAdmin() : isStaff()"), true);
 });
 
-test('US-8 | TC-041: sw-register.js heals legacy pre-v11 caches before module boot, sw.js v11 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
+test('US-8 | TC-041: sw-register.js heals legacy pre-v12 caches before module boot, sw.js v12 skips cross-origin & /api/ requests, and vercel.json omits conflicting outputDirectory', () => {
   const swRegisterJs = readRepoFile('sw-register.js');
-  assert.equal(swRegisterJs.includes('hungrybirds-cache-v11'), true);
+  assert.equal(swRegisterJs.includes('hungrybirds-cache-v12'), true);
   assert.equal(swRegisterJs.includes('caches.delete'), true);
   assert.equal(swRegisterJs.includes('reg.unregister()'), true);
   assert.equal(swRegisterJs.includes('updateViaCache: "none"'), true);
@@ -576,7 +576,7 @@ test('US-8 | TC-041: sw-register.js heals legacy pre-v11 caches before module bo
   const appModIdx = indexHtml.indexOf('src="appwebsite.js"');
   assert.equal(swRegIdx !== -1 && swRegIdx < appModIdx, true, 'sw-register.js must load before appwebsite.js in index.html');
 
-  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v11'"), true);
+  assert.equal(swJs.includes("CACHE_NAME = 'hungrybirds-cache-v12'"), true);
   assert.equal(swJs.includes('url.origin !== self.location.origin'), true);
   assert.equal(swJs.includes("url.pathname.startsWith('/api/')"), true);
   assert.equal(swJs.includes("cache: 'no-cache'"), true);
@@ -1160,6 +1160,13 @@ test('US-1 / UX-10 | TC-053: Storefront uses mascot logo brand system, hero phot
   assert.equal(indexHtml.includes('aria-label="Search menu items"'), true);
   assert.equal(indexHtml.includes('drawer-panel'), true, '#cartModal should use responsive slide-over drawer-panel');
   assert.equal(indexHtml.includes('fixed bottom-20 right-3 z-40 md:hidden'), false, 'Legacy overlapping mobile Directions/Call floating pill must be removed');
+  assert.equal(indexHtml.includes('id="mobileCartBar"'), true, '#mobileCartBar sticky mobile cart bar must exist');
+  assert.equal(indexHtml.includes('id="checkoutNotes"'), true, '#checkoutNotes kitchen instructions field must exist');
+  assert.equal(/\borange-\d{2,3}\b/.test(indexHtml), false, 'index.html should have zero leftover legacy orange-* utility classes');
+  assert.equal(/\borange-\d{2,3}\b/.test(appJs), false, 'appwebsite.js should have zero leftover legacy orange-* utility classes');
+  assert.equal(adminHtml.includes('assets/logo.png'), true, 'admin.html should display brand mascot logo');
+  assert.equal(appJs.includes('checkoutNotes'), true, 'placeOrder must read checkoutNotes');
+  assert.equal(appJs.includes('mobileCartBar'), true, 'renderFloatingCart must sync mobileCartBar');
 
   assert.equal(srcTailwind.includes('categoryShimmer'), false, 'Gimmicky active category shimmer removed');
   assert.equal(srcTailwind.includes('floatingActionPulse'), false, 'Gimmicky floating pulse animation removed');

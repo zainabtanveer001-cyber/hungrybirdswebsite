@@ -498,6 +498,11 @@ async function loadMenuFromFirestore() {
                     ? recipeId.id || null
                     : recipeId,
                 name: itemName,
+                description: firstDefined(
+                    data,
+                    ["description", "desc", "details", "subtitle"],
+                    ""
+                ),
                 price,
                 categoryId: getCategoryId(data),
                 img: firstDefined(
@@ -1318,6 +1323,25 @@ window.changeCartQty = changeCartQty;
 // ===== Floating Cart =====
 function renderFloatingCart() {
     const panel = $("floatingCart");
+    const mobileBar = $("mobileCartBar");
+
+    const count = cart.reduce(
+        (sum, item) => sum + item.qty,
+        0
+    );
+    const totalLabel = `Rs. ${getCartTotal().toLocaleString()}`;
+
+    if (mobileBar) {
+        if (cart.length === 0) {
+            mobileBar.classList.add("hidden");
+        } else {
+            mobileBar.classList.remove("hidden");
+            const mCount = $("mobileCartBarCount");
+            const mTotal = $("mobileCartBarTotal");
+            if (mCount) mCount.textContent = count;
+            if (mTotal) mTotal.textContent = totalLabel;
+        }
+    }
 
     if (!panel) return;
 
@@ -1328,68 +1352,68 @@ function renderFloatingCart() {
 
     panel.classList.add("is-visible");
 
-    const count = cart.reduce(
-        (sum, item) => sum + item.qty,
-        0
-    );
+    if ($("floatingCartCount")) {
+        $("floatingCartCount").textContent = count;
+    }
 
-    $("floatingCartCount").textContent =
-        count;
+    if ($("floatingCartTotal")) {
+        $("floatingCartTotal").textContent = totalLabel;
+    }
 
-    $("floatingCartTotal").textContent =
-        `Rs. ${getCartTotal().toLocaleString()}`;
+    const legacyItemsContainer = $("floatingCartItems");
+    if (legacyItemsContainer) {
+        legacyItemsContainer.innerHTML =
+            cart.map(item => {
+                const safeId = escapeHTML(item.id);
+                return `
+                <div class="flex justify-between items-center text-sm rounded-2xl px-2 py-2 hover:bg-brand-cream transition-colors">
 
-    $("floatingCartItems").innerHTML =
-        cart.map(item => {
-            const safeId = escapeHTML(item.id);
-            return `
-            <div class="flex justify-between items-center text-sm rounded-2xl px-2 py-2 hover:bg-gray-50 transition-colors">
+                    <div class="truncate pr-2">
 
-                <div class="truncate pr-2">
+                        <div class="font-bold text-brand-espresso truncate">
+                            ${escapeHTML(item.name)}
+                        </div>
 
-                    <div class="font-bold text-gray-800 truncate">
-                        ${escapeHTML(item.name)}
+                        <div class="text-brand-muted">
+                            Rs. ${Number(item.price).toLocaleString()} × ${item.qty}
+                        </div>
+
                     </div>
 
-                    <div class="text-gray-500">
-                        Rs. ${Number(item.price).toLocaleString()} × ${item.qty}
+                    <div class="flex items-center gap-1 shrink-0">
+
+                        <button
+                            type="button"
+                            data-action="qty"
+                            data-id="${safeId}"
+                            data-delta="-1"
+                            aria-label="Decrease quantity of ${escapeHTML(item.name)}"
+                            class="w-7 h-7 rounded-lg bg-brand-sand/70 hover:bg-brand-sand font-bold text-xs transition-colors pressable"
+                        >
+                            −
+                        </button>
+
+                        <span class="font-bold w-4 text-center text-xs tabular-nums">
+                            ${item.qty}
+                        </span>
+
+                        <button
+                            type="button"
+                            data-action="qty"
+                            data-id="${safeId}"
+                            data-delta="1"
+                            aria-label="Increase quantity of ${escapeHTML(item.name)}"
+                            class="w-7 h-7 rounded-lg bg-brand-sand/70 hover:bg-brand-sand font-bold text-xs transition-colors pressable"
+                        >
+                            +
+                        </button>
+
                     </div>
 
                 </div>
-
-                <div class="flex items-center gap-1 shrink-0">
-
-                    <button
-                        type="button"
-                        data-action="qty"
-                        data-id="${safeId}"
-                        data-delta="-1"
-                        aria-label="Decrease quantity of ${escapeHTML(item.name)}"
-                        class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-xs transition-colors pressable"
-                    >
-                        −
-                    </button>
-
-                    <span class="font-bold w-4 text-center text-xs">
-                        ${item.qty}
-                    </span>
-
-                    <button
-                        type="button"
-                        data-action="qty"
-                        data-id="${safeId}"
-                        data-delta="1"
-                        aria-label="Increase quantity of ${escapeHTML(item.name)}"
-                        class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-xs transition-colors pressable"
-                    >
-                        +
-                    </button>
-
-                </div>
-
-            </div>
-        `;
-        }).join("");
+            `;
+            }).join("");
+    }
 
     pricePulse(
         $("floatingCartTotal")
@@ -1633,10 +1657,10 @@ function renderPastOrders() {
                                 <i class="fa-solid ${escapeHTML(getStatusIcon(status))} mr-1" aria-hidden="true"></i>
                                 ${escapeHTML(getStatusLabel(status, orderType))}
                             </span>
-                            ${isActive ? '<span class="text-xs text-orange-500 font-semibold animate-pulse">● Live</span>' : ""}
+                            ${isActive ? '<span class="text-xs text-brand-red font-semibold animate-pulse">● Live</span>' : ""}
                         </div>
-                        <div class="text-xs text-gray-500 mb-1">${escapeHTML(date)}</div>
-                        <div class="text-sm text-gray-700 mt-1">${escapeHTML(itemsSummary)}</div>
+                        <div class="text-xs text-brand-muted mb-1">${escapeHTML(date)}</div>
+                        <div class="text-sm text-brand-espresso mt-1">${escapeHTML(itemsSummary)}</div>
                         ${order.estimatedReadyTime && isActive ? `
                             <div class="text-xs text-blue-600 mt-2 flex items-center gap-1">
                                 <i class="fa-solid fa-clock" aria-hidden="true"></i>
@@ -1645,13 +1669,13 @@ function renderPastOrders() {
                         ` : ""}
                     </div>
                     <div class="text-right shrink-0">
-                        <div class="font-black text-gray-900">Rs. ${Number(order.total || 0).toLocaleString()}</div>
+                        <div class="font-black text-brand-espresso tabular-nums">Rs. ${Number(order.total || 0).toLocaleString()}</div>
                         ${!isActive ? `
                             <button
                                 type="button"
                                 data-action="repeat-order"
                                 data-id="${escapeHTML(order.id)}"
-                                class="mt-2 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-orange-500 transition-colors pressable"
+                                class="mt-2 text-xs bg-brand-espresso text-white px-3 py-1.5 rounded-full hover:bg-brand-red transition-colors pressable"
                             >
                                 Repeat Order
                             </button>
@@ -1725,8 +1749,8 @@ async function trackOrderByID(orderId) {
 
     trackingContent.innerHTML = `
         <div class="text-center py-12">
-            <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
-            <p class="mt-3 text-gray-600">Loading order...</p>
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-brand-red"></i>
+            <p class="mt-3 text-brand-muted">Loading order...</p>
         </div>
     `;
     trackingError.classList.add("hidden");
@@ -1854,13 +1878,13 @@ function renderOrderTimeline(order) {
 
         return `
             <div class="timeline-step ${isCompleted ? "completed" : ""} ${isCurrent ? "current" : ""}">
-                <div class="timeline-icon ${isCompleted ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-400"}">
+                <div class="timeline-icon ${isCompleted ? "bg-brand-red text-white" : "bg-brand-sand text-brand-muted"}">
                     <i class="fa-solid ${escapeHTML(step.icon)}" aria-hidden="true"></i>
                 </div>
                 <div class="flex items-start justify-between">
                     <div>
-                        <div class="font-bold text-gray-900">${escapeHTML(step.label)}</div>
-                        ${timestamp ? `<div class="text-xs text-gray-500 mt-1">${escapeHTML(formatEstimatedTime(timestamp))}</div>` : ""}
+                        <div class="font-bold text-brand-espresso">${escapeHTML(step.label)}</div>
+                        ${timestamp ? `<div class="text-xs text-brand-muted mt-1">${escapeHTML(formatEstimatedTime(timestamp))}</div>` : ""}
                     </div>
                     ${isCurrent ? '<span class="status-pulse"></span>' : ""}
                 </div>
@@ -1873,23 +1897,23 @@ function renderOrderTimeline(order) {
             <!-- Progress Bar -->
             <div class="mb-8">
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-sm font-semibold text-gray-700">Order Progress</span>
-                    <span class="text-sm font-bold text-orange-500">${Math.round(progress)}%</span>
+                    <span class="text-sm font-semibold text-brand-espresso">Order Progress</span>
+                    <span class="text-sm font-bold text-brand-red tabular-nums">${Math.round(progress)}%</span>
                 </div>
-                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-500" style="width: ${progress}%"></div>
+                <div class="h-2 bg-brand-sand rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-brand-red to-brand-gold transition-all duration-500" style="width: ${progress}%"></div>
                 </div>
             </div>
 
             <!-- Current Status -->
-            <div class="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100">
+            <div class="mb-6 p-4 rounded-2xl bg-brand-redSoft border border-brand-red/15">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center">
+                    <div class="w-10 h-10 rounded-full bg-brand-red text-white grid place-items-center">
                         <i class="fa-solid ${escapeHTML(getStatusIcon(currentStatus))}" aria-hidden="true"></i>
                     </div>
                     <div>
-                        <div class="text-xs text-orange-600 font-semibold">Current Status</div>
-                        <div class="text-lg font-black text-gray-900">${escapeHTML(getStatusLabel(currentStatus, orderType))}</div>
+                        <div class="text-xs text-brand-redDark font-semibold">Current Status</div>
+                        <div class="text-lg font-black text-brand-espresso">${escapeHTML(getStatusLabel(currentStatus, orderType))}</div>
                     </div>
                 </div>
             </div>
@@ -2138,6 +2162,8 @@ async function placeOrder() {
     placeBtn.disabled = true;
     placeBtn.classList.add("loading");
 
+    const notes = ($("checkoutNotes")?.value || "").trim().slice(0, 250);
+
     const orderData = {
         items: cart.map(item => ({
             id: item.id,
@@ -2158,6 +2184,8 @@ async function placeOrder() {
 
         orderType:
             currentOrderType,
+
+        ...(notes ? { notes } : {}),
 
         customer: {
             name,
@@ -2209,6 +2237,7 @@ async function placeOrder() {
 
         $("checkoutPhone").value = "";
         $("checkoutAddress").value = "";
+        if ($("checkoutNotes")) $("checkoutNotes").value = "";
 
     }, 1400);
 }
@@ -2419,6 +2448,10 @@ function openItemDetailModal(id) {
     }
     if ($("itemDetailCategory")) $("itemDetailCategory").textContent = categoryName;
     if ($("itemDetailTitle")) $("itemDetailTitle").textContent = item.name;
+    if ($("itemDetailDescription")) {
+        const desc = typeof item.description === "string" ? item.description.trim() : "";
+        $("itemDetailDescription").textContent = desc || "Prepared fresh to order · Delivery & Takeaway available";
+    }
     if ($("itemDetailPrice")) $("itemDetailPrice").textContent = `Rs. ${Number(item.price).toLocaleString()}`;
     if ($("itemDetailControls")) $("itemDetailControls").innerHTML = cardControlsHTML(item.id);
 
@@ -2498,8 +2531,8 @@ function autoTrackActiveOrder() {
 
     trackingContent.innerHTML = `
         <div class="text-center py-12">
-            <i class="fa-solid fa-spinner fa-spin text-3xl text-orange-500"></i>
-            <p class="mt-3 text-gray-600">Looking for your active order...</p>
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-brand-red"></i>
+            <p class="mt-3 text-brand-muted">Looking for your active order...</p>
         </div>
     `;
     trackingError?.classList.add("hidden");
@@ -2603,14 +2636,12 @@ $("closeCartModal")?.addEventListener(
 
 $("floatingCheckoutBtn")?.addEventListener(
     "click",
-    () => {
+    openCartFlow
+);
 
-        renderCartModal();
-
-        openModal(
-            $("cartModal")
-        );
-    }
+$("mobileCartBar")?.addEventListener(
+    "click",
+    openCartFlow
 );
 
 // Delivery
@@ -2896,22 +2927,22 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
     const totalSaved = couponOrders.reduce((sum, o) => sum + (Number(o.discountAmount) || 0), 0);
 
     const progressHTML = `
-        <div class="bg-orange-50 border border-orange-100 rounded-2xl p-5">
+        <div class="bg-brand-redSoft border border-brand-red/15 rounded-2xl p-5">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-orange-500 text-white grid place-items-center shrink-0">
+                <div class="w-10 h-10 rounded-full bg-brand-red text-white grid place-items-center shrink-0">
                     <i class="fa-solid fa-star" aria-hidden="true"></i>
                 </div>
                 <div>
-                    <div class="font-bold text-gray-900">Loyalty Reward Progress</div>
-                    <div class="text-sm text-gray-500">Every 10 orders earns a 10% off coupon</div>
+                    <div class="font-bold text-brand-espresso">Loyalty Reward Progress</div>
+                    <div class="text-sm text-brand-muted">Every 10 orders earns a 10% off coupon</div>
                 </div>
             </div>
-            <div class="flex justify-between text-sm font-semibold text-gray-700 mb-1">
+            <div class="flex justify-between text-sm font-semibold text-brand-espresso mb-1">
                 <span>${progress} / 10 orders</span>
                 <span>${remainingOrders === 0 ? "Coupon earned!" : remainingOrders + " more to go"}</span>
             </div>
-            <div class="h-3 bg-white rounded-full overflow-hidden border border-orange-100">
-                <div class="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500" style="width:${pct}%"></div>
+            <div class="h-3 bg-white rounded-full overflow-hidden border border-brand-sand">
+                <div class="h-full bg-gradient-to-r from-brand-red to-brand-gold rounded-full transition-all duration-500" style="width:${pct}%"></div>
             </div>
         </div>
     `;
@@ -2921,7 +2952,7 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
         return `
         <div class="flex items-center justify-between border border-green-100 bg-green-50 rounded-2xl px-4 py-3 gap-3">
             <div>
-                <div class="font-mono font-bold text-gray-900 text-sm">${safeCode}</div>
+                <div class="font-mono font-bold text-brand-espresso text-sm">${safeCode}</div>
                 <div class="text-xs text-green-700 font-semibold mt-0.5">${Number(c.discountPercent || 0)}% off — Ready to use</div>
             </div>
             <button
@@ -2934,28 +2965,28 @@ function renderMyCoupons(orderCount, coupons, couponOrders) {
             </button>
         </div>
     `;
-    }).join("") : `<p class="text-sm text-gray-500 text-center py-3">No active coupons right now.</p>`;
+    }).join("") : `<p class="text-sm text-brand-muted text-center py-3">No active coupons right now.</p>`;
 
     const historyHTML = usedCoupons.length ? usedCoupons.map(c => {
         const saved = couponOrders.find(o => o.couponCode === c.id);
         return `
-        <div class="flex items-center justify-between border border-gray-100 rounded-2xl px-4 py-3 gap-3">
+        <div class="flex items-center justify-between border border-brand-sand rounded-2xl px-4 py-3 gap-3">
             <div>
-                <div class="font-mono font-bold text-gray-500 text-sm line-through">${escapeHTML(c.id)}</div>
-                <div class="text-xs text-gray-500 mt-0.5">${Number(c.discountPercent || 0)}% off${saved ? ` — saved Rs. ${Number(saved.discountAmount).toLocaleString()}` : ""}</div>
+                <div class="font-mono font-bold text-brand-muted text-sm line-through">${escapeHTML(c.id)}</div>
+                <div class="text-xs text-brand-muted mt-0.5">${Number(c.discountPercent || 0)}% off${saved ? ` — saved Rs. ${Number(saved.discountAmount).toLocaleString()}` : ""}</div>
             </div>
-            <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-semibold">Used</span>
+            <span class="text-xs bg-brand-sand text-brand-muted px-2 py-1 rounded-full font-semibold">Used</span>
         </div>
     `;
-    }).join("") : `<p class="text-sm text-gray-500 text-center py-3">No coupon history yet.</p>`;
+    }).join("") : `<p class="text-sm text-brand-muted text-center py-3">No coupon history yet.</p>`;
 
     const totalHTML = totalSaved > 0 ? `
-        <div class="flex items-center justify-between bg-gray-900 text-white rounded-2xl px-5 py-4">
+        <div class="flex items-center justify-between bg-brand-espresso text-white rounded-2xl px-5 py-4">
             <div class="flex items-center gap-2">
-                <i class="fa-solid fa-piggy-bank text-orange-400" aria-hidden="true"></i>
+                <i class="fa-solid fa-piggy-bank text-brand-gold" aria-hidden="true"></i>
                 <span class="font-semibold">Total saved with coupons</span>
             </div>
-            <span class="font-black text-orange-400 text-lg">Rs. ${totalSaved.toLocaleString()}</span>
+            <span class="font-black text-brand-gold text-lg tabular-nums">Rs. ${totalSaved.toLocaleString()}</span>
         </div>
     ` : "";
 
@@ -3051,7 +3082,7 @@ function renderBannerCarousel() {
 
         return `
         <div
-            class="flex-none w-full h-full relative bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600"
+            class="flex-none w-full h-full relative bg-gradient-to-r from-brand-red via-brand-redDark to-brand-espresso"
             data-slide-index="${index}"
         >
             ${linkOpenTag}
@@ -3485,7 +3516,7 @@ async function initMenu() {
                 <button
                     type="button"
                     data-action="retry-menu"
-                    class="mt-5 px-5 py-2.5 rounded-xl bg-gray-900 text-white font-bold hover:bg-orange-500 transition-colors pressable"
+                    class="mt-5 px-5 py-2.5 rounded-xl bg-brand-espresso text-white font-bold hover:bg-brand-red transition-colors pressable"
                 >
                     Retry
                 </button>
